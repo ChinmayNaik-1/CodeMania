@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="CodeMania - Competitive Coding Platform">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" 
+        content="black">
+  <meta name="apple-mobile-web-app-title" content="CodeMania">
+  <meta name="google-signin-client_id" content="745626973988-s5f7s7fo4ea28s430354odulsagdjlcm.apps.googleusercontent.com">
+  <title>CodeMania</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { 
+      margin: 0; 
+      background-color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+  <!-- Google Identity Services Library -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+  <script>
+    let googleTokenClient = null;
+
+    // Google Sign-In Callback from Google Identity Services
+    window.handleGoogleSignInResponse = function(response) {
+      console.log('🔐 [GIS-CALLBACK] Received credential from Google');
+      if (response.credential) {
+        const idToken = response.credential;
+        try {
+          // Call the Dart callback
+          if (window.dartGoogleAuthService) {
+            console.log('🔐 [GIS-CALLBACK] Calling Dart completeWebSignIn');
+            window.dartGoogleAuthService.completeWebSignIn(idToken);
+            console.log('🔐 [GIS-CALLBACK] Sent token to Dart');
+          } else {
+            console.warn('🔐 [GIS-CALLBACK] Dart GoogleAuthService not available');
+          }
+        } catch(e) {
+          console.error('🔐 [GIS-CALLBACK-ERROR] Error: ' + e);
+        }
+      }
+    };
+
+    window.triggerGoogleSignIn = function() {
+      console.log('🔐 [GIS-TRIGGER] Attempting to trigger Google Sign-In');
+      
+      // Check if Google Identity Services is loaded
+      if (typeof google === 'undefined' || !google.accounts) {
+        console.error('🔐 [GIS-ERROR] Google Identity Services library not loaded');
+        return;
+      }
+
+      try {
+        const clientId = document.querySelector('meta[name="google-signin-client_id"]').content;
+        console.log('🔐 [GIS] Client ID: ' + clientId);
+        
+        // Initialize ID services with popup mode
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: window.handleGoogleSignInResponse,
+          ux_mode: 'popup',
+          auto_select: false,
+          itp_support: true
+        });
+        console.log('🔐 [GIS] Initialized');
+        
+        // Create a container for the button
+        let buttonContainer = document.getElementById('google_signin_button_container');
+        if (!buttonContainer) {
+          buttonContainer = document.createElement('div');
+          buttonContainer.id = 'google_signin_button_container';
+          buttonContainer.style.display = 'none';
+          document.body.appendChild(buttonContainer);
+        }
+        
+        // Render the Google button to the container
+        console.log('🔐 [GIS] Rendering button');
+        google.accounts.id.renderButton(buttonContainer, {
+          type: 'standard',
+          size: 'large',
+          text: 'signin'
+        });
+        
+        // Find and click the button
+        setTimeout(() => {
+          const button = buttonContainer.querySelector('div[role="button"]');
+          if (button) {
+            console.log('🔐 [GIS] Clicking Google sign-in button');
+            button.click();
+          } else {
+            console.warn('🔐 [GIS] Button not found, trying prompt');
+            google.accounts.id.prompt();
+          }
+        }, 200);
+        
+      } catch (e) {
+        console.error('🔐 [GIS-TRIGGER-ERROR] Exception: ' + e);
+        console.error('🔐 [GIS-TRIGGER-ERROR] Stack: ' + e.stack);
+      }
+    };
+
+    // Monaco bridge for Flutter Web. This avoids relying on unstable wrappers and
+    // keeps control over language/theme/code from Dart via JS interop.
+    (function initMonacoBridge() {
+      const editors = {};
+      let monacoReady = false;
+      let initStarted = false;
+      const queuedCreates = [];
+
+      function ensureMonacoLoaded() {
+        if (monacoReady || initStarted || typeof require === 'undefined') {
+          return;
+        }
+        initStarted = true;
+
+        require.config({
+          paths: {
+            vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs'
+          }
+        });
+
+        require(['vs/editor/editor.main'], function() {
+          monacoReady = true;
+          while (queuedCreates.length > 0) {
+            const fn = queuedCreates.shift();
+            try {
+              fn();
+            } catch (e) {
+              console.error('Monaco queued create failed:', e);
+            }
+          }
+        });
+      }
+
+      function withMonaco(fn) {
+        ensureMonacoLoaded();
+        if (monacoReady) {
+          fn();
+        } else {
+          queuedCreates.push(fn);
+        }
+      }
+
+      function createEditorWhenContainerReady(containerId, options, attemptsLeft) {
+        const el = document.getElementById(containerId);
+        if (!el || !window.monaco) {
+          if (attemptsLeft > 0) {
+            window.requestAnimationFrame(function() {
+              createEditorWhenContainerReady(containerId, options, attemptsLeft - 1);
+            });
+          }
+          return;
+        }
+
+        if (editors[containerId]) {
+          editors[containerId].dispose();
+          delete editors[containerId];
+        }
+
+        const editor = monaco.editor.create(el, {
+          value: options && options.value ? options.value : '',
+          language: options && options.language ? options.language : 'python',
+          theme: options && options.theme ? options.theme : 'vs-dark',
+          automaticLayout: true,
+          minimap: { enabled: false },
+          fontSize: 15,
+          lineNumbersMinChars: 3,
+          scrollBeyondLastLine: false,
+          wordWrap: 'on',
+          roundedSelection: false,
+          tabSize: 2,
+        });
+
+        editors[containerId] = editor;
+      }
+
+      window.codemaniaMonacoCreateEditor = function(containerId, options) {
+        withMonaco(function() {
+          // Flutter platform views can be attached a frame later, so retry for
+          // a short window instead of failing silently.
+          createEditorWhenContainerReady(containerId, options, 90);
+        });
+      };
+
+      window.codemaniaMonacoSetCode = function(containerId, code) {
+        const editor = editors[containerId];
+        if (!editor) return;
+        editor.setValue(code || '');
+      };
+
+      window.codemaniaMonacoGetCode = function(containerId) {
+        const editor = editors[containerId];
+        if (!editor) return '';
+        return editor.getValue() || '';
+      };
+
+      window.codemaniaMonacoSetLanguage = function(containerId, language) {
+        const editor = editors[containerId];
+        if (!editor || !window.monaco) return;
+        monaco.editor.setModelLanguage(editor.getModel(), language || 'python');
+      };
+
+      window.codemaniaMonacoSetTheme = function(theme) {
+        withMonaco(function() {
+          if (window.monaco) {
+            monaco.editor.setTheme(theme || 'vs-dark');
+          }
+        });
+      };
+
+      window.codemaniaMonacoLayout = function(containerId) {
+        const editor = editors[containerId];
+        if (!editor) return;
+        editor.layout();
+      };
+
+      window.codemaniaMonacoDispose = function(containerId) {
+        const editor = editors[containerId];
+        if (!editor) return;
+        editor.dispose();
+        delete editors[containerId];
+      };
+
+      ensureMonacoLoaded();
+    })();
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

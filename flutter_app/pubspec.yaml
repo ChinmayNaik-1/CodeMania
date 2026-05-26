@@ -1,0 +1,53 @@
+name: codemania
+description: "LeetCode-style competitive coding platform with real-time team contests."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.13.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP + Realtime
+  dio: ^5.4.0
+  http: ^1.2.1
+  socket_io_client: ^2.0.3+1
+
+  # Authentication
+  google_sign_in: ^6.2.1
+
+  # State management
+  flutter_riverpod: ^2.4.9
+  riverpod_annotation: ^2.3.3
+  go_router: ^14.0.0
+
+  # UI
+  flutter_code_editor: ^0.3.1
+  highlight: ^0.7.0
+  flutter_markdown: ^0.6.18
+  flutter_html: ^3.0.0
+  re_editor: ^0.3.0
+  re_highlight: ^0.0.2
+  shimmer: ^3.0.0
+  google_fonts: ^7.0.0
+
+  # Storage + utils
+  shared_preferences: ^2.2.2
+  flutter_secure_storage: ^9.0.0
+  cached_network_image: ^3.3.1
+  intl: ^0.19.0
+  js: ^0.6.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.7
+  riverpod_generator: ^2.3.9
+
+flutter:
+  uses-material-design: true

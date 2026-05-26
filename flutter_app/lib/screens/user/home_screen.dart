@@ -1,0 +1,1158 @@
+import 'package:codemania/models/problem_model.dart';
+import 'package:codemania/providers/auth_provider.dart';
+import 'package:codemania/providers/contest_provider.dart';
+import 'package:codemania/providers/problem_provider.dart';
+import 'package:codemania/screens/user/problem_list_screen.dart';
+import 'package:codemania/screens/user/profile_screen.dart';
+import 'package:codemania/services/socket_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key, this.initialTab = 0});
+
+  final int initialTab;
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialTab;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(contestProvider.notifier).fetchContests();
+      ref.read(problemListProvider.notifier).fetchProblems();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final contestState = ref.watch(contestProvider);
+    final problemState = ref.watch(problemListProvider);
+    final user = authState.user;
+    final isCompact = MediaQuery.of(context).size.width < 1080;
+
+    final pages = [
+      _DashboardPage(contestState: contestState, problemState: problemState),
+      ProblemListScreen(
+        embedded: true,
+        onOpenProblem: _openProblem,
+      ),
+      _ContestsPage(contestState: contestState),
+      const ProfileScreen(embedded: true),
+    ];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F3FB),
+      drawer: isCompact
+          ? Drawer(
+              child: SafeArea(
+                child: _SideRail(
+                  selectedIndex: _selectedIndex,
+                  onItemTap: _selectTab,
+                ),
+              ),
+            )
+          : null,
+      body: SafeArea(
+        child: Row(
+          children: [
+            if (!isCompact)
+              SizedBox(
+                width: 220,
+                child: _SideRail(
+                  selectedIndex: _selectedIndex,
+                  onItemTap: _selectTab,
+                ),
+              ),
+            Expanded(
+              child: Column(
+                children: [
+                  _TopBar(
+                    username: user?.username ?? 'Coder',
+                    rating: user?.rating ?? 1200,
+                    onMenuTap: isCompact
+                        ? () => Scaffold.of(context).openDrawer()
+                        : null,
+                    onLogout: () => _confirmLogout(context, ref),
+                  ),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: KeyedSubtree(
+                        key: ValueKey<int>(_selectedIndex),
+                        child: pages[_selectedIndex],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _selectTab(int index) {
+    const tabRoutes = ['/home', '/problems', '/contests', '/profile'];
+    final targetRoute = tabRoutes[index];
+    final currentRoute = ModalRoute.of(context)?.settings.name;
+
+    if (currentRoute == targetRoute) {
+      if (_selectedIndex != index) {
+        setState(() {
+          _selectedIndex = index;
+        });
+      }
+
+      final scaffold = Scaffold.maybeOf(context);
+      if (scaffold?.isDrawerOpen ?? false) {
+        context.pop();
+      }
+      return;
+    }
+
+    context.go(targetRoute);
+  }
+
+  void _openProblem(ProblemModel problem) {
+    ref.read(problemListProvider.notifier).fetchProblemById(problem.id);
+    context.go('/problems/${problem.id}');
+  }
+
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => ctx.pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => ctx.pop(true),
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      SocketService.disconnect();
+      await ref.read(authProvider.notifier).logout();
+      if (mounted) {
+        context.go('/');
+      }
+    }
+  }
+}
+
+class _SideRail extends StatelessWidget {
+  const _SideRail({
+    required this.selectedIndex,
+    required this.onItemTap,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onItemTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (label: 'Home', icon: Icons.home_outlined),
+      (label: 'Problems', icon: Icons.code_outlined),
+      (label: 'Contests', icon: Icons.emoji_events_outlined),
+      (label: 'Profile', icon: Icons.person_outline),
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFEDEAF8),
+        border: Border(right: BorderSide(color: Color(0xFFE4DFF2))),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '<Codemania/>',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1F2148),
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(height: 22),
+            ...List.generate(items.length, (index) {
+              final item = items[index];
+              final isActive = selectedIndex == index;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  color:
+                      isActive ? const Color(0xFF5E2ED5) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    onTap: () => onItemTap(index),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            item.icon,
+                            size: 20,
+                            color: isActive
+                                ? Colors.white
+                                : const Color(0xFF68708D),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            item.label,
+                            style: TextStyle(
+                              color: isActive
+                                  ? Colors.white
+                                  : const Color(0xFF68708D),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.username,
+    required this.rating,
+    required this.onLogout,
+    this.onMenuTap,
+  });
+
+  final String username;
+  final int rating;
+  final VoidCallback onLogout;
+  final VoidCallback? onMenuTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 76,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFDFDFF),
+        border: Border(bottom: BorderSide(color: Color(0xFFE9E4F4))),
+      ),
+      child: Row(
+        children: [
+          if (onMenuTap != null) ...[
+            IconButton(
+              onPressed: onMenuTap,
+              icon: const Icon(Icons.menu),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F0FA),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Row(
+                children: [
+                  SizedBox(width: 14),
+                  Icon(Icons.search, size: 18, color: Color(0xFF96A0B5)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Search contests, problems...',
+                    style: TextStyle(color: Color(0xFF96A0B5), fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 18),
+          IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.notifications_none_rounded),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                username,
+                style: const TextStyle(
+                  color: Color(0xFF202547),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                'Rank #$rating',
+                style: const TextStyle(
+                  color: Color(0xFF7352D5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 10),
+          const CircleAvatar(
+            radius: 16,
+            backgroundColor: Color(0xFFD6C9F8),
+            child: Icon(Icons.person, size: 18, color: Color(0xFF47308B)),
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            onPressed: onLogout,
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFF7B7892)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardPage extends StatelessWidget {
+  const _DashboardPage({
+    required this.contestState,
+    required this.problemState,
+  });
+
+  final ContestState contestState;
+  final ProblemState problemState;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1320),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome back, Coder',
+                        style: TextStyle(
+                          color: Color(0xFF242453),
+                          fontSize: 44,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Rank: #420  •  12 day streak',
+                        style: TextStyle(
+                          color: Color(0xFF6E6A89),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () {},
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Color(0xFF5C2CD5),
+                    shape: StadiumBorder(),
+                    padding: EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+                  ),
+                  child: Text('Solve Today\'s Problem'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: [
+                _MetricCard(
+                  title: 'Problems Solved',
+                  value: '${problemState.problems.length}',
+                  accent: const Color(0xFF24B88A),
+                ),
+                const _MetricCard(
+                  title: 'Global Rank',
+                  value: '420',
+                  accent: Color(0xFF6A3BDE),
+                ),
+                const _MetricCard(
+                  title: 'Day Streak',
+                  value: '12',
+                  accent: Color(0xFFF4A51B),
+                ),
+                const _MetricCard(
+                  title: 'Total Points',
+                  value: '2,450',
+                  accent: Color(0xFF28A0ED),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Active Contests',
+                        style: TextStyle(
+                          color: Color(0xFF262651),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 34,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: contestState.contests.take(2).map((contest) {
+                          return _ContestMiniCard(contest.title);
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Recommended For You',
+                        style: TextStyle(
+                          color: Color(0xFF262651),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 34,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _PracticeCard(
+                              'Valid Palindrome', 'Easy', '64% solved this'),
+                          _PracticeCard(
+                              'Climbing Stairs', 'Medium', '42% solved this'),
+                          _PracticeCard(
+                              'Merge K Lists', 'Hard', '18% solved this'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const SizedBox(
+                  width: 300,
+                  child: _DashboardSide(),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.accent,
+  });
+
+  final String title;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 250,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFDFF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE7E1F3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.circle, size: 10, color: accent),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(color: Color(0xFF6D7691), fontSize: 14),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Color(0xFF21274B),
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContestMiniCard extends StatelessWidget {
+  const _ContestMiniCard(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 360,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFDFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7E1F3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF242453),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEBE6FA),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'LIVE',
+                  style: TextStyle(
+                    color: Color(0xFF5E2ED5),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 8,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9E5F4),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: 0.58,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4EA9E8),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '1.2k participants',
+                style: TextStyle(color: Color(0xFF75809A)),
+              ),
+              FilledButton(
+                onPressed: () {},
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF5E2ED5),
+                  shape: const StadiumBorder(),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                ),
+                child: const Text('Enter Contest'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PracticeCard extends StatelessWidget {
+  const _PracticeCard(this.title, this.level, this.progress);
+
+  final String title;
+  final String level;
+  final String progress;
+
+  @override
+  Widget build(BuildContext context) {
+    Color badgeColor;
+    switch (level.toLowerCase()) {
+      case 'easy':
+        badgeColor = const Color(0xFF49C889);
+        break;
+      case 'medium':
+        badgeColor = const Color(0xFFF5AD2E);
+        break;
+      default:
+        badgeColor = const Color(0xFFFF6F6A);
+    }
+
+    return Container(
+      width: 230,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFDFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7E1F3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: badgeColor.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              level,
+              style: TextStyle(
+                color: badgeColor,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF262651),
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            progress,
+            style: const TextStyle(
+              color: Color(0xFF7A829D),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 6,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9E5F4),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: 0.5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6A3BDE),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {},
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF5E2ED5),
+                shape: const StadiumBorder(),
+              ),
+              child: const Text('Solve Now'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardSide extends StatelessWidget {
+  const _DashboardSide();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDFDFF),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFE7E1F3)),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Recent Activity',
+                style: TextStyle(
+                  color: Color(0xFF262651),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 26,
+                ),
+              ),
+              SizedBox(height: 12),
+              _ActivityRow('Two Sum', 'Accepted'),
+              _ActivityRow('Reverse Integer', 'Accepted'),
+              _ActivityRow('Longest Substring', 'Runtime Error'),
+              _ActivityRow('Valid Parentheses', 'Accepted'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6A35E4), Color(0xFF4A1EA7)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Join Discussion',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 30,
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Discuss problems with 50k+ developers on Discord.',
+                style: TextStyle(color: Color(0xFFD6CCF5)),
+              ),
+              SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.all(Radius.circular(999)),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'Join Channel',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF5E2ED5),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow(this.problem, this.verdict);
+
+  final String problem;
+  final String verdict;
+
+  @override
+  Widget build(BuildContext context) {
+    final accepted = verdict.toLowerCase() == 'accepted';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F5FC),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                problem,
+                style: const TextStyle(
+                  color: Color(0xFF242A4A),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: accepted
+                    ? const Color(0xFFDAF4E9)
+                    : const Color(0xFFFFE2E2),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                verdict,
+                style: TextStyle(
+                  color: accepted
+                      ? const Color(0xFF1D9E70)
+                      : const Color(0xFFE25A5A),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContestsPage extends StatefulWidget {
+  const _ContestsPage({required this.contestState});
+
+  final ContestState contestState;
+
+  @override
+  State<_ContestsPage> createState() => _ContestsPageState();
+}
+
+class _ContestsPageState extends State<_ContestsPage> {
+  String _filter = 'Live';
+
+  @override
+  Widget build(BuildContext context) {
+    final contests = widget.contestState.contests;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1320),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Contests',
+              style: TextStyle(
+                color: Color(0xFF242453),
+                fontWeight: FontWeight.w900,
+                fontSize: 52,
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Compete live. Climb the ranks.',
+              style: TextStyle(color: Color(0xFF7A839E), fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDEAF8),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: ['Live', 'Upcoming', 'Past'].map((item) {
+                  final active = _filter == item;
+                  return GestureDetector(
+                    onTap: () => setState(() => _filter = item),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: active ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        item,
+                        style: TextStyle(
+                          color: active
+                              ? const Color(0xFF4F27BA)
+                              : const Color(0xFF6A7390),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF5A24CD), Color(0xFF3E147E)],
+                ),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Codemania Grand Prix #10',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 52,
+                            fontWeight: FontWeight.w900,
+                            height: 0.95,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'The ultimate competitive programming challenge.\nSolve 6 algorithmic problems in 3 hours.',
+                          style:
+                              TextStyle(color: Color(0xFFDACFF8), fontSize: 16),
+                        ),
+                        SizedBox(height: 18),
+                        Row(
+                          children: [
+                            _ContestMetaPill('Ends in 01:24:55'),
+                            SizedBox(width: 10),
+                            _ContestMetaPill('12,450 participants'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 18),
+                  Icon(Icons.emoji_events_outlined,
+                      color: Color(0xFFFFD86D), size: 82),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: contests.take(6).map((contest) {
+                return _ContestGridCard(contest.title);
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContestMetaPill extends StatelessWidget {
+  const _ContestMetaPill(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFFE7DCFF),
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _ContestGridCard extends StatelessWidget {
+  const _ContestGridCard(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 308,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFDFF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE7E1F3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE4E4),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'LIVE',
+                  style: TextStyle(
+                    color: Color(0xFFE95F5F),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAE6F8),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'MEDIUM',
+                  style: TextStyle(
+                    color: Color(0xFF5E2ED5),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF28284E),
+              fontSize: 27,
+              fontWeight: FontWeight.w800,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 6,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE9E5F4),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: 0.72,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6A3BDE),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '2.4k competitors',
+                style: TextStyle(color: Color(0xFF7A839E)),
+              ),
+              FilledButton(
+                onPressed: () {},
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF5E2ED5),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text('Enter'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
