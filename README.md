@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # CodeMania — LeetCode-Style Competitive Coding Platform
 
 A real-time team-based competitive coding platform with instant code judging, live leaderboards, and multi-language support. Built with Flutter (web & Android), Node.js/Express, PostgreSQL, Redis, Socket.IO, and Piston API.
@@ -392,3 +393,7 @@ Contributions welcome! Submit issues and pull requests on GitHub.
 ---
 
 **Happy Coding! 🚀**
+=======
+# CodeMania
+A coding platform developed using flutter.
+>>>>>>> f8abc0daa185882bd1c77a9721aba493eae46f18
