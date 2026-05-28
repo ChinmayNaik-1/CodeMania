@@ -121,7 +121,7 @@ router.get('/problems/:problemId/testcases', async (req, res) => {
     }
 
     const result = await dbPool.query(
-      `SELECT id, input, expected_output, explanation, is_hidden
+      `SELECT id, input, expected_output, explanation, image_url, is_hidden
        FROM test_cases
        WHERE problem_id = $1
        ORDER BY is_hidden ASC, id ASC`,
@@ -142,6 +142,7 @@ router.post('/problems/:problemId/testcases', async (req, res) => {
       input,
       expected_output: expectedOutput,
       explanation,
+      image_url: imageUrl,
       is_hidden: isHidden,
     } = req.body;
 
@@ -153,10 +154,10 @@ router.post('/problems/:problemId/testcases', async (req, res) => {
     }
 
     const result = await dbPool.query(
-      `INSERT INTO test_cases (problem_id, input, expected_output, explanation, is_hidden)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, input, expected_output, explanation, is_hidden`,
-      [problemId, input, expectedOutput, explanation ?? null, isHidden === true]
+      `INSERT INTO test_cases (problem_id, input, expected_output, explanation, image_url, is_hidden)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, input, expected_output, explanation, image_url, is_hidden`,
+      [problemId, input, expectedOutput, explanation ?? null, imageUrl ?? null, isHidden === true]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -174,6 +175,7 @@ router.put('/problems/:problemId/testcases/:testcaseId', async (req, res) => {
       input,
       expected_output: expectedOutput,
       explanation,
+      image_url: imageUrl,
       is_hidden: isHidden,
     } = req.body;
 
@@ -197,6 +199,10 @@ router.put('/problems/:problemId/testcases/:testcaseId', async (req, res) => {
       updates.push(`explanation = $${paramCount++}`);
       params.push(explanation);
     }
+    if (imageUrl !== undefined) {
+      updates.push(`image_url = $${paramCount++}`);
+      params.push(imageUrl);
+    }
     if (isHidden !== undefined) {
       updates.push(`is_hidden = $${paramCount++}`);
       params.push(isHidden === true);
@@ -212,7 +218,7 @@ router.put('/problems/:problemId/testcases/:testcaseId', async (req, res) => {
       `UPDATE test_cases
        SET ${updates.join(', ')}
        WHERE id = $${paramCount++} AND problem_id = $${paramCount}
-       RETURNING id, input, expected_output, explanation, is_hidden`,
+       RETURNING id, input, expected_output, explanation, image_url, is_hidden`,
       params
     );
 

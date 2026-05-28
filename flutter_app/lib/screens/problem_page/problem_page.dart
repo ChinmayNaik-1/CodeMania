@@ -179,9 +179,7 @@ class _ProblemPageState extends ConsumerState<ProblemPage>
       final inputs = cases.isNotEmpty
           ? cases.map((tc) => _buildTestInput(tc.params)).toList()
           : <String>[
-            problem.examples.isNotEmpty
-              ? (problem.examples.first.input ?? '')
-                  : '',
+              problem.examples.isNotEmpty ? problem.examples.first.input : '',
             ];
 
       final responses = await Future.wait(
@@ -275,20 +273,16 @@ class _ProblemPageState extends ConsumerState<ProblemPage>
     final problem = ref.read(problemProvider(widget.problemId)).problem;
     if (problem == null) return;
 
-    final sourceCases = problem.testCases.isNotEmpty
-      ? problem.testCases
-      : (problem.sampleTestCases ?? const []);
-
-    final defaults = sourceCases.isNotEmpty
-      ? sourceCases
-        .map((tc) => {
-            ...tc.inputs,
-            '_expectedOutput': tc.expectedOutput,
-          })
-        .toList()
-      : <Map<String, String>>[
-        {'input': ''}
-        ];
+    final defaults = problem.examples.isNotEmpty
+        ? problem.examples
+            .map((example) => {
+                  'input': example.input,
+                  '_expectedOutput': example.expectedOutput,
+                })
+            .toList()
+        : <Map<String, String>>[
+            {'input': ''},
+          ];
 
     final signature = defaults
         .map((row) => row.entries.map((e) => '${e.key}:${e.value}').join('|'))
@@ -341,9 +335,7 @@ class _ProblemPageState extends ConsumerState<ProblemPage>
           'code': state.currentCode,
           if (contestId != null) 'contestId': contestId,
           if (contestId != null) 'teamId': teamId,
-            'test_input': problem.examples.isNotEmpty
-              ? (problem.examples.first.input ?? '')
-              : '',
+            'test_input': problem.examples.isNotEmpty ? problem.examples.first.input : '',
         },
       );
 

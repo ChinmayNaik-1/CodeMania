@@ -5,9 +5,11 @@ class Problem {
   final String title;
   final String difficulty;
   final String description;
-  final List<Example> examples;
-  final List<String> constraints;
+  final List<ExampleModel> examples;
+  final String? constraints;
   final List<String> topics;
+  final List<String> hints;
+  final String? followUp;
   final List<String> companies;
   final List<String> inputFormat;
   final List<TestCase> testCases;
@@ -21,8 +23,10 @@ class Problem {
     required this.difficulty,
     required this.description,
     this.examples = const [],
-    this.constraints = const [],
+    this.constraints,
     this.topics = const [],
+    this.hints = const [],
+    this.followUp,
     this.companies = const [],
     this.inputFormat = const [],
     this.testCases = const [],
@@ -32,12 +36,11 @@ class Problem {
   });
 
   factory Problem.fromJson(Map<String, dynamic> json) {
-    final rawExamples =
-        (json['examples'] as List?) ?? (json['sample_test_cases'] as List?) ?? (json['test_cases'] as List?);
+    final rawExamples = (json['examples'] as List?) ?? const [];
     final parsedExamples = rawExamples
-      ?.whereType<Map>()
-      .map((e) => Example.fromJson(Map<String, dynamic>.from(e)))
-      .toList() ?? const <Example>[];
+      .whereType<Map>()
+      .map((e) => ExampleModel.fromJson(Map<String, dynamic>.from(e)))
+      .toList();
 
     final rawInputFormat = json['input_format'] as List?;
     final parsedInputFormat = rawInputFormat?.map((e) => e.toString()).toList() ?? const <String>[];
@@ -49,18 +52,13 @@ class Problem {
         .toList();
 
     final rawTopics = (json['topics'] as List?) ?? (json['tags'] as List?);
-
-    List<String> parsedConstraints;
+    String? parsedConstraints;
     if (json['constraints'] is List) {
-      parsedConstraints = (json['constraints'] as List).map((c) => c.toString()).toList();
+      parsedConstraints = (json['constraints'] as List)
+          .map((c) => c.toString())
+          .join('\n');
     } else if (json['constraints'] is String) {
-      parsedConstraints = (json['constraints'] as String)
-          .split('\n')
-          .map((c) => c.trim())
-          .where((c) => c.isNotEmpty)
-          .toList();
-    } else {
-      parsedConstraints = const <String>[];
+      parsedConstraints = json['constraints'] as String;
     }
 
     return Problem(
@@ -69,10 +67,12 @@ class Problem {
       difficulty: (json['difficulty'] as String?) ?? 'Easy',
       description: (json['description'] as String?) ?? '',
       examples: parsedExamples,
-      constraints: parsedConstraints,
+        constraints: parsedConstraints,
       topics: rawTopics
           ?.map((t) => t.toString())
           .toList() ?? const <String>[],
+        hints: (json['hints'] as List?)?.map((h) => h.toString()).toList() ?? const <String>[],
+        followUp: json['follow_up'] as String?,
       companies: (json['companies'] as List?)
           ?.map((c) => c.toString())
           .toList() ?? const <String>[],
@@ -95,6 +95,8 @@ class Problem {
       'examples': examples.map((e) => e.toJson()).toList(),
       'constraints': constraints,
       'topics': topics,
+      'hints': hints,
+      'follow_up': followUp,
       'companies': companies,
       'input_format': inputFormat,
       'test_cases': testCases.map((e) => e.toJson()).toList(),
@@ -121,40 +123,6 @@ class Problem {
 
   // Compatibility getters for existing UI/provider usage.
   List<String> get tags => topics;
-
-  List<TestCase>? get sampleTestCases {
-    if (testCases.isNotEmpty) return testCases;
-    if (examples.isEmpty) return null;
-    return examples.asMap().entries.map((entry) {
-      final parsedInputs = _parseInputString(entry.value.input ?? '');
-      return TestCase(
-        id: (entry.key + 1).toString(),
-        label: 'Case ${entry.key + 1}',
-        inputs: parsedInputs,
-        expectedOutput: entry.value.output ?? '',
-        explanation: entry.value.explanation,
-      );
-    }).toList();
-  }
-
-  static Map<String, String> _parseInputString(String input) {
-    final lines = input
-        .split('\n')
-        .map((line) => line.trim())
-        .where((line) => line.isNotEmpty)
-        .toList();
-    final parsed = <String, String>{};
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      final eq = line.indexOf('=');
-      if (eq > 0) {
-        parsed[line.substring(0, eq).trim()] = line.substring(eq + 1).trim();
-      } else {
-        parsed['input${i + 1}'] = line;
-      }
-    }
-    return parsed;
-  }
 }
 
 class CodeStubs {
@@ -189,30 +157,38 @@ class CodeStubs {
   }
 }
 
-class Example {
-  final String? input;
-  final String? output;
+class ExampleModel {
+  final int id;
+  final String input;
+  final String expectedOutput;
   final String? explanation;
+  final String? imageUrl;
 
-  Example({
-    this.input,
-    this.output,
+  ExampleModel({
+    required this.id,
+    required this.input,
+    required this.expectedOutput,
     this.explanation,
+    this.imageUrl,
   });
 
-  factory Example.fromJson(Map<String, dynamic> json) {
-    return Example(
-      input: json['input'] as String?,
-      output: (json['output'] as String?) ?? (json['expected_output'] as String?),
+  factory ExampleModel.fromJson(Map<String, dynamic> json) {
+    return ExampleModel(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      input: (json['input'] ?? '').toString(),
+      expectedOutput: (json['expected_output'] ?? '').toString(),
       explanation: json['explanation'] as String?,
+      imageUrl: json['image_url'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'input': input,
-      'output': output,
+      'expected_output': expectedOutput,
       'explanation': explanation,
+      'image_url': imageUrl,
     };
   }
 }

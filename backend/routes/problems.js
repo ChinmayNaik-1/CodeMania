@@ -8,110 +8,79 @@ const allowedCodeStubKeys = new Set(['cpp', 'python', 'java', 'javascript']);
 
 function validateCodeStubs(raw) {
   if (raw === undefined) {
-    return { value: null, error: null };
+    return { value: undefined, error: null };
   }
 
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { value: null, error: 'code_stubs must be an object' };
+    return { value: undefined, error: 'code_stubs must be an object' };
   }
 
   for (const [key, value] of Object.entries(raw)) {
     if (!allowedCodeStubKeys.has(key)) {
-      return { value: null, error: `Invalid language key in code_stubs: ${key}` };
+      return { value: undefined, error: `Invalid language key in code_stubs: ${key}` };
     }
     if (typeof value !== 'string') {
-      return { value: null, error: `code_stubs.${key} must be a string` };
+      return { value: undefined, error: `code_stubs.${key} must be a string` };
     }
   }
 
   return { value: raw, error: null };
 }
 
-function parseListField(value) {
-  if (Array.isArray(value)) return value.map((v) => String(v));
-  if (typeof value !== 'string') return [];
-
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) return parsed.map((v) => String(v));
-  } catch (_) {
-    // Ignore JSON parse errors; fallback to line/comma split.
+function validateStringArray(value, fieldName) {
+  if (value === undefined) {
+    return { value: undefined, error: null };
   }
 
-  if (trimmed.includes('\n')) {
-    return trimmed
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+  if (!Array.isArray(value)) {
+    return { value: undefined, error: `${fieldName} must be an array of strings` };
   }
 
-  if (trimmed.includes(',')) {
-    return trimmed
-      .split(',')
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0);
-  }
+  return { value: value.map((item) => String(item)), error: null };
+}
 
-  return [trimmed];
+function normalizeProblemRow(row) {
+  return {
+    ...row,
+    topics: row.topics ?? [],
+    hints: row.hints ?? [],
+    follow_up: row.follow_up ?? null,
+    code_stubs: row.code_stubs ?? {},
+  };
 }
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const { difficulty, tag, search, page = 1, limit = 20 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    const columnsResult = await dbPool.query(
-      `SELECT column_name
-       FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = 'problems'`
-    );
-    const problemColumns = new Set(columnsResult.rows.map((row) => row.column_name));
-    const baseCols = ['id', 'title', 'description', 'difficulty', 'tags', 'is_active', 'created_at'];
-    const selectedCols = problemColumns.has('code_stubs')
-      ? [...baseCols, 'code_stubs']
-      : baseCols;
-
-    let query = `SELECT ${selectedCols.join(', ')} FROM problems WHERE is_active = true AND visibility = 'public'`;
-    const params = [];
-
-    if (difficulty) {
-      query += ` AND difficulty = $${params.length + 1}`;
-      params.push(difficulty);
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Missing user context', code: 'AUTH_ERROR' });
     }
 
-    if (tag) {
-      query += ` AND $${params.length + 1} = ANY(tags)`;
-      params.push(tag);
-    }
-
-    if (search) {
-      query += ` AND (title ILIKE $${params.length + 1} OR description ILIKE $${params.length + 2})`;
-      params.push(`%${search}%`);
-      params.push(`%${search}%`);
-    }
-
-    query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(parseInt(limit));
-    params.push(offset);
-
-    const result = await dbPool.query(query, params);
-
-    const countResult = await dbPool.query(
-      "SELECT COUNT(*) as total FROM problems WHERE is_active = true AND visibility = 'public'"
+    const result = await dbPool.query(
+      `SELECT p.id,
+              p.title,
+              p.difficulty,
+              p.topics,
+              EXISTS (
+                SELECT 1
+                FROM submissions s
+                WHERE s.problem_id = p.id
+                  AND s.user_id = $1
+                  AND s.verdict = 'accepted'
+              ) AS is_solved
+       FROM problems p
+       ORDER BY p.id ASC`,
+      [userId]
     );
 
-    res.json({
-      problems: result.rows,
-      total: parseInt(countResult.rows[0].total),
-      page: parseInt(page),
-      limit: parseInt(limit),
-    });
+    return res.json(result.rows.map((row) => ({
+      ...row,
+      topics: row.topics ?? [],
+      is_solved: row.is_solved === true,
+    })));
   } catch (error) {
     console.error('Get problems error:', error);
-    res.status(500).json({ error: 'Failed to fetch problems', code: 'FETCH_ERROR' });
+    return res.status(500).json({ error: 'Failed to fetch problems', code: 'FETCH_ERROR' });
   }
 });
 
@@ -120,88 +89,77 @@ router.get('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const isAdmin = req.user?.role === 'admin';
 
-    const [problemColumnsResult, testCaseColumnsResult] = await Promise.all([
-      dbPool.query(
-        `SELECT column_name
-         FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = 'problems'`
-      ),
-      dbPool.query(
-        `SELECT column_name
-         FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = 'test_cases'`
-      ),
-    ]);
-
-    const problemColumns = new Set(problemColumnsResult.rows.map((row) => row.column_name));
-    const testCaseColumns = new Set(testCaseColumnsResult.rows.map((row) => row.column_name));
-
-    const baseProblemCols = ['id', 'title', 'description', 'difficulty', 'tags', 'is_active', 'created_at'];
-    const optionalProblemCols = ['constraints', 'input_format', 'topics', 'companies', 'hint', 'code_stubs'];
-    const selectedProblemCols = [
-      ...baseProblemCols,
-      ...optionalProblemCols.filter((col) => problemColumns.has(col)),
-    ];
-
-    const problemResult = await dbPool.query(
-      `SELECT ${selectedProblemCols.join(', ')}
-       FROM problems
-       WHERE id = $1 AND is_active = true`,
-      [id]
+    const result = await dbPool.query(
+      `SELECT p.id,
+              p.title,
+              p.difficulty,
+              p.description,
+              p.topics,
+              p.constraints,
+              p.hints,
+              p.follow_up,
+              p.code_stubs,
+              COALESCE(
+                (
+                  SELECT json_agg(
+                    json_build_object(
+                      'id', t.id,
+                      'input', t.input,
+                      'expected_output', t.expected_output,
+                      'explanation', t.explanation,
+                      'image_url', t.image_url
+                    )
+                    ORDER BY t.id
+                  )
+                  FROM test_cases t
+                  WHERE t.problem_id = p.id AND t.is_hidden = false
+                ),
+                '[]'::json
+              ) AS examples,
+              CASE WHEN $2
+                THEN COALESCE(
+                  (
+                    SELECT json_agg(
+                      json_build_object(
+                        'id', t.id,
+                        'input', t.input,
+                        'expected_output', t.expected_output,
+                        'explanation', t.explanation,
+                        'image_url', t.image_url
+                      )
+                      ORDER BY t.id
+                    )
+                    FROM test_cases t
+                    WHERE t.problem_id = p.id AND t.is_hidden = true
+                  ),
+                  '[]'::json
+                )
+                ELSE NULL
+              END AS hidden_testcases
+       FROM problems p
+       WHERE p.id = $1`,
+      [id, isAdmin]
     );
 
-    if (problemResult.rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Problem not found', code: 'NOT_FOUND' });
     }
 
-    const testCaseSelectCols = ['id', 'input', 'expected_output'];
-    if (testCaseColumns.has('explanation')) testCaseSelectCols.push('explanation');
-    if (testCaseColumns.has('is_hidden')) testCaseSelectCols.push('is_hidden');
+    const problem = normalizeProblemRow(result.rows[0]);
 
-    const testCasesResult = await dbPool.query(
-      `SELECT ${testCaseSelectCols.join(', ')}
-       FROM test_cases
-       WHERE problem_id = $1
-       ORDER BY id ASC`,
-      [id]
-    );
-
-    const problem = problemResult.rows[0];
-    const inputFormat = parseListField(problem.input_format);
-    const constraints = parseListField(problem.constraints);
-
-    const examples = [];
-    const hiddenTestCases = [];
-
-    for (const testCase of testCasesResult.rows) {
-      const normalized = {
-        id: String(testCase.id),
-        input: testCase.input,
-        expected_output: testCase.expected_output,
-        explanation: testCase.explanation ?? null,
-      };
-
-      const isHidden = testCaseColumns.has('is_hidden') ? testCase.is_hidden === true : false;
-      if (isHidden) {
-        hiddenTestCases.push(normalized);
-      } else {
-        examples.push(normalized);
-      }
-    }
-
-    const responseBody = {
-      ...problem,
-      constraints,
-      input_format: inputFormat,
-      examples,
-    };
-
-    if (isAdmin) {
-      responseBody.hidden_testcases = hiddenTestCases;
-      responseBody.hidden_count = hiddenTestCases.length;
-    }
-
-    return res.json(responseBody);
+    return res.json({
+      id: problem.id,
+      title: problem.title,
+      difficulty: problem.difficulty,
+      description: problem.description,
+      topics: problem.topics,
+      constraints: problem.constraints,
+      hints: problem.hints,
+      follow_up: problem.follow_up,
+      code_stubs: problem.code_stubs,
+      examples: problem.examples || [],
+      hidden_testcases: problem.hidden_testcases ?? null,
+    });
   } catch (error) {
     console.error('Get problem error:', error);
     return res.status(500).json({ error: 'Failed to fetch problem', code: 'FETCH_ERROR' });
@@ -214,36 +172,39 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
       title,
       description,
       difficulty,
-      tags,
-      testCases,
+      topics,
       constraints,
-      input_format,
-      visibility: visibilityRaw,
-      contest_id: contestIdRaw,
+      hints,
+      follow_up: followUp,
       code_stubs: codeStubsRaw,
+      testCases,
     } = req.body;
+
+    const normalizedDifficulty = typeof difficulty === 'string'
+      ? difficulty.trim().toLowerCase()
+      : difficulty;
+
+    if (!title || !description || !normalizedDifficulty) {
+      return res.status(400).json({ error: 'Missing required fields', code: 'INVALID_INPUT' });
+    }
+
+    const { value: normalizedTopics, error: topicsError } = validateStringArray(topics, 'topics');
+    if (topicsError) {
+      return res.status(400).json({ error: topicsError, code: 'INVALID_INPUT' });
+    }
+
+    const { value: normalizedHints, error: hintsError } = validateStringArray(hints, 'hints');
+    if (hintsError) {
+      return res.status(400).json({ error: hintsError, code: 'INVALID_INPUT' });
+    }
 
     const { value: codeStubs, error: codeStubError } = validateCodeStubs(codeStubsRaw);
     if (codeStubError) {
       return res.status(400).json({ error: codeStubError, code: 'INVALID_INPUT' });
     }
 
-    if (!title || !description || !difficulty) {
-      return res.status(400).json({ error: 'Missing required fields', code: 'INVALID_INPUT' });
-    }
-
-    const visibility = visibilityRaw || 'public';
-    if (!['public', 'contest_only'].includes(visibility)) {
-      return res.status(400).json({ error: 'Invalid visibility', code: 'INVALID_INPUT' });
-    }
-
-    const contestId = contestIdRaw ?? null;
-
-    if (contestId !== null && visibility === 'contest_only') {
-      const contestCheck = await dbPool.query('SELECT id FROM contests WHERE id = $1', [contestId]);
-      if (contestCheck.rows.length === 0) {
-        return res.status(400).json({ error: 'Contest not found', code: 'INVALID_INPUT' });
-      }
+    if (testCases !== undefined && !Array.isArray(testCases)) {
+      return res.status(400).json({ error: 'testCases must be an array', code: 'INVALID_INPUT' });
     }
 
     const client = await dbPool.connect();
@@ -251,61 +212,50 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
     try {
       await client.query('BEGIN');
 
-      const problemColumnsResult = await client.query(
-        `SELECT column_name
-         FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = 'problems'`
-      );
-      const problemColumns = new Set(problemColumnsResult.rows.map((row) => row.column_name));
-
-      const insertCols = ['title', 'description', 'difficulty', 'tags', 'created_by'];
-      const insertValues = [title, description, difficulty, tags || [], req.user.firebase_uid];
-
-      if (problemColumns.has('visibility')) {
-        insertCols.push('visibility');
-        insertValues.push(visibility);
-      }
-
-      if (problemColumns.has('contest_id')) {
-        insertCols.push('contest_id');
-        insertValues.push(contestId);
-      }
-
-      if (problemColumns.has('constraints')) {
-        insertCols.push('constraints');
-        insertValues.push(Array.isArray(constraints) ? constraints : []);
-      }
-      if (problemColumns.has('input_format')) {
-        insertCols.push('input_format');
-        insertValues.push(Array.isArray(input_format) ? input_format : []);
-      }
-      if (problemColumns.has('code_stubs')) {
-        insertCols.push('code_stubs');
-        insertValues.push(JSON.stringify(codeStubs ?? {}));
-      }
-
-      const placeholders = insertCols
-        .map((col, idx) => (col === 'code_stubs' ? `$${idx + 1}::jsonb` : `$${idx + 1}`))
-        .join(', ');
-
-      const problemResult = await client.query(
-        `INSERT INTO problems (${insertCols.join(', ')}) VALUES (${placeholders}) RETURNING id`,
-        insertValues
+      const insertResult = await client.query(
+        `INSERT INTO problems (
+           title,
+           description,
+           difficulty,
+           topics,
+           constraints,
+           hints,
+           follow_up,
+           code_stubs
+         )
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb)
+         RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs`,
+        [
+          title,
+          description,
+          normalizedDifficulty,
+          normalizedTopics ?? [],
+          constraints ?? null,
+          JSON.stringify(normalizedHints ?? []),
+          followUp ?? null,
+          JSON.stringify(codeStubs ?? {}),
+        ]
       );
 
-      const problemId = problemResult.rows[0].id;
+      const problem = insertResult.rows[0];
 
       if (Array.isArray(testCases) && testCases.length > 0) {
         for (const tc of testCases) {
+          if (!tc?.input || !tc?.expected_output) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Each testCase needs input and expected_output', code: 'INVALID_INPUT' });
+          }
+
           await client.query(
-            `INSERT INTO test_cases (problem_id, input, expected_output, explanation, is_hidden)
-             VALUES ($1, $2, $3, $4, $5)`,
+            `INSERT INTO test_cases (problem_id, input, expected_output, explanation, is_hidden, image_url)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
             [
-              problemId,
+              problem.id,
               tc.input,
               tc.expected_output,
               tc.explanation ?? null,
               tc.is_hidden === true,
+              tc.image_url ?? null,
             ]
           );
         }
@@ -313,13 +263,7 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
 
       await client.query('COMMIT');
 
-      return res.status(201).json({
-        id: problemId,
-        title,
-        description,
-        difficulty,
-        tags,
-      });
+      return res.status(201).json(normalizeProblemRow(problem));
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -339,49 +283,35 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       title,
       description,
       difficulty,
-      tags,
-      is_active,
+      topics,
       constraints,
-      input_format,
-      visibility: visibilityRaw,
-      contest_id: contestIdRaw,
+      hints,
+      follow_up: followUp,
       code_stubs: codeStubsRaw,
     } = req.body;
+
+    const normalizedDifficulty = typeof difficulty === 'string'
+      ? difficulty.trim().toLowerCase()
+      : difficulty;
+
+    const { value: normalizedTopics, error: topicsError } = validateStringArray(topics, 'topics');
+    if (topicsError) {
+      return res.status(400).json({ error: topicsError, code: 'INVALID_INPUT' });
+    }
+
+    const { value: normalizedHints, error: hintsError } = validateStringArray(hints, 'hints');
+    if (hintsError) {
+      return res.status(400).json({ error: hintsError, code: 'INVALID_INPUT' });
+    }
 
     const { value: codeStubs, error: codeStubError } = validateCodeStubs(codeStubsRaw);
     if (codeStubError) {
       return res.status(400).json({ error: codeStubError, code: 'INVALID_INPUT' });
     }
 
-    const problemColumnsResult = await dbPool.query(
-      `SELECT column_name
-       FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = 'problems'`
-    );
-    const problemColumns = new Set(problemColumnsResult.rows.map((row) => row.column_name));
-
     const updates = [];
     const params = [];
     let paramCount = 1;
-
-    if (visibilityRaw !== undefined && problemColumns.has('visibility')) {
-      if (!['public', 'contest_only'].includes(visibilityRaw)) {
-        return res.status(400).json({ error: 'Invalid visibility', code: 'INVALID_INPUT' });
-      }
-      updates.push(`visibility = $${paramCount++}`);
-      params.push(visibilityRaw);
-    }
-
-    if (contestIdRaw !== undefined && problemColumns.has('contest_id')) {
-      if (contestIdRaw !== null) {
-        const contestCheck = await dbPool.query('SELECT id FROM contests WHERE id = $1', [contestIdRaw]);
-        if (contestCheck.rows.length === 0) {
-          return res.status(400).json({ error: 'Contest not found', code: 'INVALID_INPUT' });
-        }
-      }
-      updates.push(`contest_id = $${paramCount++}`);
-      params.push(contestIdRaw);
-    }
 
     if (title !== undefined) {
       updates.push(`title = $${paramCount++}`);
@@ -391,27 +321,27 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       updates.push(`description = $${paramCount++}`);
       params.push(description);
     }
-    if (difficulty !== undefined) {
+    if (normalizedDifficulty !== undefined) {
       updates.push(`difficulty = $${paramCount++}`);
-      params.push(difficulty);
+      params.push(normalizedDifficulty);
     }
-    if (tags !== undefined) {
-      updates.push(`tags = $${paramCount++}`);
-      params.push(tags);
+    if (normalizedTopics !== undefined) {
+      updates.push(`topics = $${paramCount++}`);
+      params.push(normalizedTopics);
     }
-    if (is_active !== undefined) {
-      updates.push(`is_active = $${paramCount++}`);
-      params.push(is_active);
-    }
-    if (constraints !== undefined && problemColumns.has('constraints')) {
+    if (constraints !== undefined) {
       updates.push(`constraints = $${paramCount++}`);
-      params.push(Array.isArray(constraints) ? constraints : []);
+      params.push(constraints);
     }
-    if (input_format !== undefined && problemColumns.has('input_format')) {
-      updates.push(`input_format = $${paramCount++}`);
-      params.push(Array.isArray(input_format) ? input_format : []);
+    if (normalizedHints !== undefined) {
+      updates.push(`hints = $${paramCount++}::jsonb`);
+      params.push(JSON.stringify(normalizedHints));
     }
-    if (codeStubs !== null && problemColumns.has('code_stubs')) {
+    if (followUp !== undefined) {
+      updates.push(`follow_up = $${paramCount++}`);
+      params.push(followUp);
+    }
+    if (codeStubs !== undefined) {
       updates.push(`code_stubs = $${paramCount++}::jsonb`);
       params.push(JSON.stringify(codeStubs));
     }
@@ -423,7 +353,10 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
     params.push(id);
 
     const result = await dbPool.query(
-      `UPDATE problems SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      `UPDATE problems
+       SET ${updates.join(', ')}
+       WHERE id = $${paramCount}
+       RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs`,
       params
     );
 
@@ -431,7 +364,7 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       return res.status(404).json({ error: 'Problem not found', code: 'NOT_FOUND' });
     }
 
-    return res.json(result.rows[0]);
+    return res.json(normalizeProblemRow(result.rows[0]));
   } catch (error) {
     console.error('Update problem error:', error);
     return res.status(500).json({ error: 'Failed to update problem', code: 'UPDATE_ERROR' });

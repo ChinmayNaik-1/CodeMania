@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:codemania/config.dart';
 import 'package:codemania/models/problem_model.dart';
+import 'package:codemania/features/problem/providers/testcase_provider.dart';
 import 'package:codemania/providers/auth_provider.dart';
 import 'package:codemania/services/api_service.dart';
 import 'package:codemania/services/runtime_service.dart';
@@ -121,7 +122,20 @@ class ProblemNotifier extends StateNotifier<ProblemState> {
       if (search != null) url += '&search=$search';
 
       final response = await ApiService.get(url);
-      final rawProblems = (response.data['problems'] as List? ?? const []);
+      final responseData = response.data;
+      final List<dynamic> rawProblems;
+      final int resolvedTotal;
+
+      if (responseData is List) {
+        rawProblems = responseData;
+        resolvedTotal = responseData.length;
+      } else if (responseData is Map) {
+        rawProblems = (responseData['problems'] as List? ?? const []);
+        resolvedTotal = (responseData['total'] as num?)?.toInt() ?? rawProblems.length;
+      } else {
+        rawProblems = const [];
+        resolvedTotal = 0;
+      }
       final parsedProblems = rawProblems
           .map((p) => ProblemModel.fromJson(p as Map<String, dynamic>))
           .toList();
@@ -129,7 +143,7 @@ class ProblemNotifier extends StateNotifier<ProblemState> {
       state = state.copyWith(
         problems: parsedProblems,
         currentPage: page,
-        total: (response.data['total'] as num?)?.toInt() ?? parsedProblems.length,
+        total: resolvedTotal,
         isLoading: false,
       );
     } catch (e) {
@@ -170,6 +184,16 @@ class ProblemNotifier extends StateNotifier<ProblemState> {
       final problem = Problem.fromJson(response.data as Map<String, dynamic>);
       final selectedLanguage = state.selectedLanguage;
       final initialCode = _resolveStub(problem.codeStubs, selectedLanguage);
+      final defaults = problem.examples.isNotEmpty
+          ? problem.examples
+              .map((example) => {
+                    'input': example.input,
+                    '_expectedOutput': example.expectedOutput,
+                  })
+              .toList()
+          : <Map<String, String>>[
+              {'input': ''},
+            ];
 
       state = state.copyWith(
         problem: problem,
@@ -178,6 +202,9 @@ class ProblemNotifier extends StateNotifier<ProblemState> {
         isSolved: problem.isSolved ?? false,
         isLoading: false,
       );
+
+      ref.read(testcaseProvider(problem.id.toString()).notifier).initWithDefaults(defaults);
+      ref.read(selectedCaseIndexProvider(problem.id.toString()).notifier).state = 0;
     } catch (e) {
       state = state.copyWith(
         error: 'Failed to load problem: $e',
@@ -252,10 +279,10 @@ class ProblemNotifier extends StateNotifier<ProblemState> {
           'language': language,
           'version': _runtimeVersion(language),
           'code': code,
-          'test_input': customInput ??
-              ((state.problem!.examples?.isNotEmpty ?? false)
-                  ? (state.problem!.examples!.first.input ?? '')
-                  : ''),
+            'test_input': customInput ??
+              (state.problem!.examples.isNotEmpty
+                ? state.problem!.examples.first.input
+                : ''),
         },
       );
 

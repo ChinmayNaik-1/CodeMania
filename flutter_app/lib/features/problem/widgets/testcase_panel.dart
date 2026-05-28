@@ -152,41 +152,67 @@ class _TestcasePanelState extends ConsumerState<TestcasePanel> {
           child: ListView(
             padding: const EdgeInsets.all(14),
             children: [
-              for (final entry in selectedCase.params.entries) ...[
-                Text(
-                  '${entry.key} =',
-                  style: const TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextFormField(
-                  initialValue: entry.value,
-                  readOnly: true,
-                  style: const TextStyle(
-                    fontFamily: 'JetBrains Mono',
-                    fontSize: 13,
-                    color: Color(0xFFE5E7EB),
-                  ),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: isDark ? const Color(0xFF23272F) : const Color(0xFF111827),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF374151)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF374151)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
+              _caseBlock(
+                label: 'Input',
+                value: _formatParams(selectedCase.params),
+                isDark: isDark,
+              ),
+              const SizedBox(height: 12),
+              _caseBlock(
+                label: 'Output',
+                value: selectedCase.expectedOutput ?? '',
+                isDark: isDark,
+              ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatParams(Map<String, String> params) {
+    if (params.isEmpty) return '';
+    if (params.length == 1 && params.containsKey('input')) {
+      return params['input'] ?? '';
+    }
+
+    return params.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n');
+  }
+
+  Widget _caseBlock({
+    required String label,
+    required String value,
+    required bool isDark,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF9CA3AF),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF23272F) : const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isDark ? const Color(0xFF374151) : const Color(0xFFD1D5DB),
+            ),
+          ),
+          child: SelectableText(
+            value,
+            style: TextStyle(
+              fontFamily: 'JetBrains Mono',
+              fontSize: 13,
+              color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
+            ),
           ),
         ),
       ],
