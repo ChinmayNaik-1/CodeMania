@@ -442,4 +442,41 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── GET /api/submissions/heatmap?userId=:id ────────────────────────────────
+// Returns daily submission counts for the past 365 days.
+// Auth required — any authenticated user can view any public heatmap.
+router.get('/heatmap', authMiddleware, async (req, res) => {
+  try {
+    const userId = parseInt(req.query.userId || req.user.id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid userId' });
+    }
+
+    const result = await dbPool.query(
+      `SELECT
+         DATE(created_at AT TIME ZONE 'UTC') AS date,
+         COUNT(*) AS count
+       FROM submissions
+       WHERE user_id = $1
+         AND created_at >= NOW() - INTERVAL '1 year'
+       GROUP BY DATE(created_at AT TIME ZONE 'UTC')
+       ORDER BY date ASC`,
+      [userId]
+    );
+
+    res.json({
+      heatmap: result.rows.map(r => ({
+        date: r.date instanceof Date
+          ? r.date.toISOString().split('T')[0]
+          : String(r.date).split('T')[0],
+        count: parseInt(r.count, 10),
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/submissions/heatmap error:', err);
+    res.status(500).json({ error: 'Failed to load heatmap' });
+  }
+});
+
 export default router;
+

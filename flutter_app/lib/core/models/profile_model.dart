@@ -104,6 +104,8 @@ class UserProfileModel {
   final StreakModel streak;
   final List<ContestHistoryEntry> contestHistory;
   final List<RecentAC> recentAC;
+  final DateTime? createdAt;
+
 
   UserProfileModel({
     required this.id,
@@ -123,6 +125,7 @@ class UserProfileModel {
     required this.streak,
     required this.contestHistory,
     required this.recentAC,
+    this.createdAt,
   });
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
@@ -147,6 +150,9 @@ class UserProfileModel {
       streak: StreakModel.fromJson(json['streak'] ?? {}),
       contestHistory: (json['contest_history'] as List?)?.map((c) => ContestHistoryEntry.fromJson(c)).toList() ?? [],
       recentAC: (json['recent_ac'] as List?)?.map((r) => RecentAC.fromJson(r)).toList() ?? [],
+      createdAt: user['created_at'] != null
+          ? DateTime.tryParse(user['created_at'] as String)
+          : null,
     );
   }
 }

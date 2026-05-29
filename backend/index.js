@@ -23,6 +23,8 @@ import submissionsApiRoutes from './routes/submissions.js';
 import adminRoutes from './routes/admin.js';
 import userCodeRoutes from './routes/usercode.js';
 import profileRoutes from './routes/profile.js';
+import friendsRoutes from './routes/friends.js';
+import usersRoutes from './routes/users.js';
 import { initPresenceSocket } from './socket/presence.js';
 
 const app = express();
@@ -41,6 +43,8 @@ function isApiPath(requestPath = '') {
     requestPath.startsWith('/api/contests') ||
     requestPath.startsWith('/submit') ||
     requestPath.startsWith('/api/submissions') ||
+    requestPath.startsWith('/api/friends') ||
+    requestPath.startsWith('/api/users') ||
     requestPath.startsWith('/api/admin') ||
     requestPath.startsWith('/api/usercode') ||
     requestPath.startsWith('/socket.io')
@@ -148,6 +152,10 @@ app.use('/api/submissions', submissionsApiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/usercode', userCodeRoutes);
 app.use('/api', profileRoutes);
+app.use('/api/friends', friendsRoutes);
+app.use('/api/users', usersRoutes);
+// Friends leaderboard alias
+app.use('/api/leaderboard/friends', (req, res) => res.redirect('/api/friends/leaderboard'));
 
 app.use(express.static(flutterBuildDir, {
   maxAge: '1y',
