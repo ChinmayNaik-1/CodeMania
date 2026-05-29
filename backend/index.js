@@ -22,6 +22,8 @@ import submissionRoutes from './routes/submissionRoutes.js';
 import submissionsApiRoutes from './routes/submissions.js';
 import adminRoutes from './routes/admin.js';
 import userCodeRoutes from './routes/usercode.js';
+import profileRoutes from './routes/profile.js';
+import { initPresenceSocket } from './socket/presence.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -145,6 +147,7 @@ app.use('/submit', submissionRoutes);
 app.use('/api/submissions', submissionsApiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/usercode', userCodeRoutes);
+app.use('/api', profileRoutes);
 
 app.use(express.static(flutterBuildDir, {
   maxAge: '1y',
@@ -195,6 +198,7 @@ app.use((req, res) => {
 
 setSocketIo(io);
 initContestSocket(io);
+initPresenceSocket(io);
 initSubmissionQueue(io, dbPool);
 
 async function checkPistonHealth() {

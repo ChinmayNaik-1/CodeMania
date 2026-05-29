@@ -6,6 +6,8 @@ import {
   emitTeamFeedUpdate,
   emitUserSubmissionResult,
 } from '../socket/contestSocket.js';
+import { recordActivity } from './profileService.js';
+
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const queueName = 'submission-queue';
@@ -50,6 +52,9 @@ export function initSubmissionQueue(io, dbPool) {
     } = job.data;
 
     const submissionResult = await judgeSubmission(code, language, version, problemId, dbPool);
+
+    await recordActivity(userId, submissionResult.verdict, problemId);
+
 
     await dbPool.query(
       `UPDATE submissions

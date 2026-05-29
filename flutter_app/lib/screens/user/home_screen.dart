@@ -3,7 +3,7 @@ import 'package:codemania/providers/auth_provider.dart';
 import 'package:codemania/providers/contest_provider.dart';
 import 'package:codemania/providers/problem_provider.dart';
 import 'package:codemania/screens/user/problem_list_screen.dart';
-import 'package:codemania/screens/user/profile_screen.dart';
+
 import 'package:codemania/services/socket_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,7 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onOpenProblem: _openProblem,
       ),
       _ContestsPage(contestState: contestState),
-      const ProfileScreen(embedded: true),
+      const SizedBox.shrink(),
     ];
 
     return Scaffold(
@@ -102,7 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _selectTab(int index) {
-    const tabRoutes = ['/home', '/problems', '/contests', '/profile'];
+    const tabRoutes = ['/home', '/problems', '/contests', '/friends'];
     final targetRoute = tabRoutes[index];
     final currentRoute = ModalRoute.of(context)?.settings.name;
 
@@ -175,7 +175,7 @@ class _SideRail extends StatelessWidget {
       (label: 'Home', icon: Icons.home_outlined),
       (label: 'Problems', icon: Icons.code_outlined),
       (label: 'Contests', icon: Icons.emoji_events_outlined),
-      (label: 'Profile', icon: Icons.person_outline),
+      (label: 'Friends', icon: Icons.people_outline),
     ];
 
     return Container(
@@ -248,7 +248,7 @@ class _SideRail extends StatelessWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends ConsumerWidget {
   const _TopBar({
     required this.username,
     required this.rating,
@@ -262,7 +262,7 @@ class _TopBar extends StatelessWidget {
   final VoidCallback? onMenuTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       height: 76,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -327,10 +327,18 @@ class _TopBar extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 10),
-          const CircleAvatar(
-            radius: 16,
-            backgroundColor: Color(0xFFD6C9F8),
-            child: Icon(Icons.person, size: 18, color: Color(0xFF47308B)),
+          InkWell(
+            onTap: () {
+              final authState = ref.read(authProvider);
+              if (authState.user != null) {
+                context.push('/profile/${authState.user!.id}');
+              }
+            },
+            child: const CircleAvatar(
+              radius: 16,
+              backgroundColor: Color(0xFFD6C9F8),
+              child: Icon(Icons.person, size: 18, color: Color(0xFF47308B)),
+            ),
           ),
           const SizedBox(width: 10),
           IconButton(

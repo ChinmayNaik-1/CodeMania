@@ -12,6 +12,8 @@ import 'package:codemania/screens/contests/contest_list_screen.dart';
 import 'package:codemania/screens/problem_page/problem_page.dart';
 import 'package:codemania/screens/public/landing_screen.dart';
 import 'package:codemania/screens/user/home_screen.dart';
+import 'package:codemania/screens/user/profile_screen.dart';
+import 'package:codemania/features/friends/screens/friends_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -75,9 +77,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HomeScreen(initialTab: 0),
       ),
       GoRoute(
-        path: '/profile',
+        path: '/profile/:userId',
         name: 'profile',
-        builder: (context, state) => const HomeScreen(initialTab: 3),
+        builder: (context, state) {
+          final userId = int.tryParse(state.pathParameters['userId'] ?? '0') ?? 0;
+          return ProfileScreen(userId: userId);
+        },
+      ),
+      GoRoute(
+        path: '/friends',
+        name: 'friends',
+        builder: (context, state) => const FriendsScreen(),
       ),
       GoRoute(
         path: '/problems',
