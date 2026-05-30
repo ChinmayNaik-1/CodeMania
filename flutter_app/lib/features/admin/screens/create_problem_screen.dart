@@ -318,7 +318,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(createProblemProvider);
     final title = _isEditing
-        ? 'Edit Problem: ${widget.editingProblem!.title}'
+        ? 'Edit Problem: ${state.value?.title ?? '...'}'
         : 'Create Problem';
 
     return Scaffold(
