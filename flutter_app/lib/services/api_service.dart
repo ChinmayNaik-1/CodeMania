@@ -42,9 +42,7 @@ class ApiService {
             print('📡 [ERROR] ${error.message}');
             print('📡 [ERROR-TYPE] ${error.type}');
             print('📡 [ERROR-CODE] ${error.response?.statusCode}');
-            if (error.requestOptions != null) {
-              print('📡 [ERROR-URL] ${error.requestOptions?.path}');
-            }
+            print('📡 [ERROR-URL] ${error.requestOptions.path}');
           }
           return handler.next(error);
         },

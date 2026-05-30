@@ -127,12 +127,16 @@ export async function getProfileData(targetUserId, requestingUserId) {
         [targetUserId]
       ),
       dbPool.query(
-        `SELECT uch.rank, uch.score, uch.rating_after, uch.participated_at,
-                c.title as contest_title
-         FROM user_contest_history uch
-         JOIN contests c ON uch.contest_id = c.id
-         WHERE uch.user_id = $1
-         ORDER BY uch.participated_at ASC`,
+        `SELECT 
+            0 as rank, 
+            cl.total_score as score, 
+            1500 as rating_after, 
+            COALESCE(cl.last_accepted_at, c.start_time) as participated_at,
+            c.title as contest_title
+         FROM contest_leaderboard cl
+         JOIN contests c ON cl.contest_id = c.id
+         WHERE cl.user_id = $1
+         ORDER BY participated_at ASC`,
         [targetUserId]
       ),
       dbPool.query(

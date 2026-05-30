@@ -43,6 +43,7 @@ router.post('/problems/:problemId/driver', async (req, res) => {
 });
 
 router.get('/problems/:problemId/drivers', async (req, res) => {
+  console.log(`[DEBUG] GET /problems/${req.params.problemId}/drivers hit by user ${req.user?.id}`);
   try {
     const problemId = parseInt(req.params.problemId, 10);
     if (Number.isNaN(problemId)) {
@@ -114,6 +115,7 @@ router.delete('/problems/:problemId/driver/:language', async (req, res) => {
 });
 
 router.get('/problems/:problemId/testcases', async (req, res) => {
+  console.log(`[DEBUG] GET /problems/${req.params.problemId}/testcases hit by user ${req.user?.id}`);
   try {
     const problemId = parseInt(req.params.problemId, 10);
     if (Number.isNaN(problemId)) {

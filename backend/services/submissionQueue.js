@@ -1,5 +1,5 @@
 import Bull from 'bull';
-import { applyContestScoring, judgeSubmission } from './judgeService.js';
+import { judgeSubmission } from './judgeService.js';
 import { publishContestEvent } from './leaderboardService.js';
 import {
   emitSubmissionResult,
@@ -7,6 +7,7 @@ import {
   emitUserSubmissionResult,
 } from '../socket/contestSocket.js';
 import { recordActivity } from './profileService.js';
+import { recordContestSubmission } from './contestService.js';
 
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -92,10 +93,24 @@ export function initSubmissionQueue(io, dbPool) {
     );
 
     if (submissionRow.rows.length > 0) {
-      await applyContestScoring({
-        submission: submissionRow.rows[0],
-        finalVerdict: submissionResult.verdict,
-      });
+      // Wire new contest scoring
+      const subRow = submissionRow.rows[0];
+      if (subRow.contest_id) {
+        try {
+          await recordContestSubmission(
+            subRow.contest_id,
+            subRow.problem_id,
+            subRow.user_id,
+            subRow.team_id ?? null,
+            submissionResult.verdict,
+            job.data.language,
+            job.data.code,
+            io
+          );
+        } catch (contestErr) {
+          console.error('Contest scoring error:', contestErr);
+        }
+      }
     }
 
     const userPayload = {

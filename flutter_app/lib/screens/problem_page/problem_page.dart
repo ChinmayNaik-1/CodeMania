@@ -7,7 +7,6 @@ import 'package:codemania/features/problem/providers/user_code_provider.dart';
 import 'package:codemania/features/problem/providers/testcase_provider.dart';
 import 'package:codemania/features/submissions/submission_provider.dart';
 import 'package:codemania/features/submissions/widgets/verdict_panel.dart';
-import 'package:codemania/providers/contest_provider.dart';
 import 'package:codemania/providers/problem_provider.dart';
 import 'package:codemania/screens/problem_page/widgets/code_editor_panel.dart';
 import 'package:codemania/screens/problem_page/widgets/tab_bar_panel.dart';
@@ -309,37 +308,33 @@ class _ProblemPageState extends ConsumerState<ProblemPage>
     notifier.setRunResult(null);
 
     try {
-      int? teamId;
       final contestId = widget.contestId;
-      if (contestId != null) {
-        final team = await ref.read(myTeamProvider(contestId).future);
-        if (team == null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Join a team before submitting in a contest.')),
-            );
-          }
-          notifier.setIsSubmitting(false);
-          return;
-        }
-        teamId = team.id;
-      }
+      final String submitPath;
+      final Map<String, dynamic> submitData;
 
-      final response = await ApiService.post(
-        '/submit',
-        data: {
+      if (contestId != null) {
+        // Contest submission goes through the new contest endpoint
+        submitPath = '/api/contests/$contestId/problems/${problem.id}/submit';
+        submitData = {
+          'language': state.selectedLanguage,
+          'code': state.currentCode,
+        };
+      } else {
+        submitPath = '/submit';
+        submitData = {
           'problemId': problem.id,
           'problem_id': problem.id,
           'language': state.selectedLanguage,
           'version': _versionForLanguage(state.selectedLanguage),
           'code': state.currentCode,
-          if (contestId != null) 'contestId': contestId,
-          if (contestId != null) 'teamId': teamId,
-            'test_input': problem.examples.isNotEmpty ? problem.examples.first.input : '',
-        },
-      );
+          'test_input': problem.examples.isNotEmpty ? problem.examples.first.input : '',
+        };
+      }
 
-      final submissionId = (response.data['submissionId'] as num?)?.toInt();
+      final response = await ApiService.post(submitPath, data: submitData);
+
+      final submissionId = (response.data['submission_id'] as num?)?.toInt()
+          ?? (response.data['submissionId'] as num?)?.toInt();
       if (submissionId == null) {
         notifier.setRunResult({'status': 'Submit Failed', 'got': 'Missing submission id'});
         return;

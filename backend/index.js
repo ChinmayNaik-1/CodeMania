@@ -16,8 +16,7 @@ import { initSubmissionQueue } from './services/submissionQueue.js';
 
 import authRoutes from './routes/authRoutes.js';
 import problemRoutes from './routes/problems.js';
-import contestRoutes from './routes/contestRoutes.js';
-import contestApiRoutes from './routes/contests.js';
+import contestRoutes from './routes/contests.js';
 import submissionRoutes from './routes/submissionRoutes.js';
 import submissionsApiRoutes from './routes/submissions.js';
 import adminRoutes from './routes/admin.js';
@@ -145,8 +144,7 @@ app.get('/health', (req, res) => {
 
 app.use('/auth', authRoutes);
 app.use('/problems', problemRoutes);
-app.use('/contests', contestRoutes);
-app.use('/api/contests', contestApiRoutes);
+app.use('/api/contests', contestRoutes);
 app.use('/submit', submissionRoutes);
 app.use('/api/submissions', submissionsApiRoutes);
 app.use('/api/admin', adminRoutes);

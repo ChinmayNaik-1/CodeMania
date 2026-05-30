@@ -148,55 +148,50 @@ class LegacyContestNotifier extends StateNotifier<ContestState> {
   Future<void> fetchContests() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiService.get('/contests');
-      final contests = (response.data as List)
-          .map((c) => ContestModel.fromJson(c as Map<String, dynamic>))
-          .toList();
-
-      state = state.copyWith(contests: contests, isLoading: false);
+      final response = await ApiService.get('/api/contests');
+      final data = response.data as Map<String, dynamic>? ?? {};
+      final allContests = [
+        ...((data['upcoming'] as List? ?? []).map((c) => ContestModel.fromJson(c as Map<String, dynamic>))),
+        ...((data['live'] as List? ?? []).map((c) => ContestModel.fromJson(c as Map<String, dynamic>))),
+        ...((data['ended'] as List? ?? []).map((c) => ContestModel.fromJson(c as Map<String, dynamic>))),
+      ];
+      state = state.copyWith(contests: allContests, isLoading: false);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
-      rethrow;
     }
   }
 
   Future<void> fetchContestById(int contestId) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final response = await ApiService.get('/contests/$contestId');
-      final contest = ContestModel.fromJson(response.data);
+      final response = await ApiService.get('/api/contests/$contestId');
+      final contest = ContestModel.fromJson(response.data as Map<String, dynamic>);
       state = state.copyWith(activeContest: contest, isLoading: false);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
-      rethrow;
     }
   }
 
   Future<void> fetchLeaderboard(int contestId) async {
     try {
-      final response = await ApiService.get('/contests/$contestId/leaderboard');
-      final teams = (response.data['teams'] as List)
+      final response = await ApiService.get('/api/contests/$contestId/leaderboard');
+      final raw = response.data;
+      final teams = (raw is List ? raw : (raw as Map?)?['leaderboard'] as List? ?? [])
           .map((t) => TeamScoreModel.fromJson(t as Map<String, dynamic>))
           .toList();
-
       state = state.copyWith(leaderboard: teams);
     } catch (e) {
       state = state.copyWith(error: e.toString());
-      rethrow;
     }
   }
 
   Future<void> joinContest(int contestId, String joinCode) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      await ApiService.post(
-        '/contests/$contestId/join',
-        data: {'joinCode': joinCode},
-      );
+      await ApiService.post('/api/contests/$contestId/register');
       state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
-      rethrow;
     }
   }
 

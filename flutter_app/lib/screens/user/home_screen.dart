@@ -1,7 +1,8 @@
 import 'package:codemania/models/problem_model.dart';
 import 'package:codemania/providers/auth_provider.dart';
-import 'package:codemania/providers/contest_provider.dart';
 import 'package:codemania/providers/problem_provider.dart';
+import 'package:codemania/features/contests/providers/contest_provider.dart';
+import 'package:codemania/core/models/contest_model.dart';
 import 'package:codemania/screens/user/problem_list_screen.dart';
 
 import 'package:codemania/services/socket_service.dart';
@@ -26,7 +27,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _selectedIndex = widget.initialTab;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(contestProvider.notifier).fetchContests();
       ref.read(problemListProvider.notifier).fetchProblems();
     });
   }
@@ -34,18 +34,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final contestState = ref.watch(contestProvider);
     final problemState = ref.watch(problemListProvider);
     final user = authState.user;
     final isCompact = MediaQuery.of(context).size.width < 1080;
 
     final pages = [
-      _DashboardPage(contestState: contestState, problemState: problemState),
+      _DashboardPage(problemState: problemState),
       ProblemListScreen(
         embedded: true,
         onOpenProblem: _openProblem,
       ),
-      _ContestsPage(contestState: contestState),
+      const SizedBox.shrink(),
       const SizedBox.shrink(),
     ];
 
@@ -351,17 +350,16 @@ class _TopBar extends ConsumerWidget {
   }
 }
 
-class _DashboardPage extends StatelessWidget {
+class _DashboardPage extends ConsumerWidget {
   const _DashboardPage({
-    required this.contestState,
     required this.problemState,
   });
 
-  final ContestState contestState;
   final ProblemState problemState;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contestsAsync = ref.watch(contestListProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: ConstrainedBox(
@@ -450,12 +448,27 @@ class _DashboardPage extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: contestState.contests.take(2).map((contest) {
-                          return _ContestMiniCard(contest.title);
-                        }).toList(),
+                      contestsAsync.when(
+                        loading: () => const CircularProgressIndicator(),
+                        error: (e, _) => const Text('Failed to load contests'),
+                        data: (contestsList) {
+                          final active = [
+                            ...?contestsList['live'],
+                            ...?contestsList['upcoming'],
+                          ].take(2).toList();
+                          
+                          if (active.isEmpty) {
+                            return const Text('No active contests right now', style: TextStyle(color: Color(0xFF6E6A89)));
+                          }
+                          
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: active.map((contest) {
+                              return _ContestMiniCard(contest: contest);
+                            }).toList(),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                       const Text(
@@ -553,12 +566,14 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _ContestMiniCard extends StatelessWidget {
-  const _ContestMiniCard(this.title);
+  const _ContestMiniCard({required this.contest});
 
-  final String title;
+  final ContestModel contest;
 
   @override
   Widget build(BuildContext context) {
+    final isLive = contest.status == 'live';
+    
     return Container(
       width: 360,
       padding: const EdgeInsets.all(16),
@@ -574,7 +589,7 @@ class _ContestMiniCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  title,
+                  contest.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -585,16 +600,15 @@ class _ContestMiniCard extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEBE6FA),
+                  color: isLive ? const Color(0xFFEBE6FA) : const Color(0xFFE7E1F3),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: const Text(
-                  'LIVE',
+                child: Text(
+                  isLive ? 'LIVE' : 'UPCOMING',
                   style: TextStyle(
-                    color: Color(0xFF5E2ED5),
+                    color: isLive ? const Color(0xFF5E2ED5) : const Color(0xFF6B7280),
                     fontWeight: FontWeight.w800,
                     fontSize: 11,
                   ),
@@ -603,48 +617,97 @@ class _ContestMiniCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Container(
-            height: 8,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE9E5F4),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: 0.58,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4EA9E8),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '1.2k participants',
-                style: TextStyle(color: Color(0xFF75809A)),
-              ),
-              FilledButton(
-                onPressed: () {},
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF5E2ED5),
-                  shape: const StadiumBorder(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5E2ED5).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('Enter Contest'),
+                child: Text(
+                  contest.contestType == 'team' ? 'Team' : 'Solo',
+                  style: const TextStyle(
+                      color: Color(0xFF5E2ED5),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700),
+                ),
               ),
+              const Spacer(),
+              const Icon(Icons.timer_outlined, size: 16, color: Color(0xFF75809A)),
+              const SizedBox(width: 4),
+              _MiniTimer(contest: contest),
             ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => context.go('/contests/${contest.id}'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF5E2ED5),
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+              ),
+              child: Text(isLive ? 'Enter Contest' : 'Register'),
+            ),
           ),
         ],
       ),
     );
+  }
+}
+
+class _MiniTimer extends StatefulWidget {
+  const _MiniTimer({required this.contest});
+  final ContestModel contest;
+
+  @override
+  State<_MiniTimer> createState() => _MiniTimerState();
+}
+
+class _MiniTimerState extends State<_MiniTimer> {
+  late Duration _rem;
+  bool _disposed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _update();
+    _tick();
+  }
+  
+  void _tick() async {
+    while (!_disposed) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (_disposed) break;
+      if (mounted) setState(_update);
+    }
+  }
+
+  void _update() {
+    final target = widget.contest.status == 'live'
+        ? widget.contest.endTime
+        : widget.contest.startTime;
+    final diff = target.toUtc().difference(DateTime.now().toUtc());
+    _rem = diff.isNegative ? Duration.zero : diff;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.contest.status == 'ended' || _rem == Duration.zero) {
+      return const Text('Ended', style: TextStyle(color: Color(0xFF75809A), fontSize: 13));
+    }
+    final h = _rem.inHours.toString().padLeft(2, '0');
+    final m = (_rem.inMinutes % 60).toString().padLeft(2, '0');
+    final s = (_rem.inSeconds % 60).toString().padLeft(2, '0');
+    return Text('$h:$m:$s', style: const TextStyle(color: Color(0xFF75809A), fontSize: 13, fontWeight: FontWeight.w600));
   }
 }
 
@@ -894,273 +957,3 @@ class _ActivityRow extends StatelessWidget {
   }
 }
 
-class _ContestsPage extends StatefulWidget {
-  const _ContestsPage({required this.contestState});
-
-  final ContestState contestState;
-
-  @override
-  State<_ContestsPage> createState() => _ContestsPageState();
-}
-
-class _ContestsPageState extends State<_ContestsPage> {
-  String _filter = 'Live';
-
-  @override
-  Widget build(BuildContext context) {
-    final contests = widget.contestState.contests;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1320),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Contests',
-              style: TextStyle(
-                color: Color(0xFF242453),
-                fontWeight: FontWeight.w900,
-                fontSize: 52,
-                letterSpacing: -1,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Compete live. Climb the ranks.',
-              style: TextStyle(color: Color(0xFF7A839E), fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFEDEAF8),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: ['Live', 'Upcoming', 'Past'].map((item) {
-                  final active = _filter == item;
-                  return GestureDetector(
-                    onTap: () => setState(() => _filter = item),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active ? Colors.white : Colors.transparent,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        item,
-                        style: TextStyle(
-                          color: active
-                              ? const Color(0xFF4F27BA)
-                              : const Color(0xFF6A7390),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF5A24CD), Color(0xFF3E147E)],
-                ),
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: const Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Codemania Grand Prix #10',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 52,
-                            fontWeight: FontWeight.w900,
-                            height: 0.95,
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'The ultimate competitive programming challenge.\nSolve 6 algorithmic problems in 3 hours.',
-                          style:
-                              TextStyle(color: Color(0xFFDACFF8), fontSize: 16),
-                        ),
-                        SizedBox(height: 18),
-                        Row(
-                          children: [
-                            _ContestMetaPill('Ends in 01:24:55'),
-                            SizedBox(width: 10),
-                            _ContestMetaPill('12,450 participants'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 18),
-                  Icon(Icons.emoji_events_outlined,
-                      color: Color(0xFFFFD86D), size: 82),
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: contests.take(6).map((contest) {
-                return _ContestGridCard(contest.title);
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ContestMetaPill extends StatelessWidget {
-  const _ContestMetaPill(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFFE7DCFF),
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _ContestGridCard extends StatelessWidget {
-  const _ContestGridCard(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 308,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFDFDFF),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE7E1F3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE4E4),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  'LIVE',
-                  style: TextStyle(
-                    color: Color(0xFFE95F5F),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEAE6F8),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  'MEDIUM',
-                  style: TextStyle(
-                    color: Color(0xFF5E2ED5),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF28284E),
-              fontSize: 27,
-              fontWeight: FontWeight.w800,
-              height: 1.05,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            height: 6,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE9E5F4),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: 0.72,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6A3BDE),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '2.4k competitors',
-                style: TextStyle(color: Color(0xFF7A839E)),
-              ),
-              FilledButton(
-                onPressed: () {},
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF5E2ED5),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Text('Enter'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}

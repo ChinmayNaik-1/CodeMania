@@ -60,17 +60,29 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   final List<int> _deletedIds = [];
 
   bool _isSaving = false;
+  bool _isInit = false;
+  bool _isContestExclusive = false;
 
   bool get _isEditing => widget.editingProblem != null;
 
   @override
   void initState() {
     super.initState();
-    if (_isEditing) {
-      _loadProblem(widget.editingProblem!.id);
-    } else {
-      _entries.add(TestCaseEntry());
+    _difficulty = 'Easy';
+    if (widget.visibility != null) {
+      _isContestExclusive = widget.visibility == 'contest_only';
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isEditing) {
+        _loadProblem(widget.editingProblem!.id);
+      } else {
+        setState(() {
+          _entries.add(TestCaseEntry());
+          _isInit = true;
+        });
+      }
+    });
   }
 
   @override
@@ -109,6 +121,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
     _constraintsCtrl.text = problem.constraints ?? '';
     _followUpCtrl.text = problem.followUp ?? '';
     _difficulty = _normalizeDifficulty(problem.difficulty);
+    _isContestExclusive = problem.isContestExclusive;
 
     _hintControllers
       ..forEach((ctrl) => ctrl.dispose())
@@ -125,7 +138,9 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
     await _loadDriverCode(id);
 
     if (mounted) {
-      setState(() {});
+      setState(() {
+        _isInit = true;
+      });
     }
   }
 
@@ -133,7 +148,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
     _entries.clear();
     try {
       final response = await ApiService.get('/api/admin/problems/$id/testcases');
-      if (response.data is List) {
+      if (response.data is List && (response.data as List).isNotEmpty) {
         for (final row in (response.data as List).whereType<Map>()) {
           final mapped = Map<String, dynamic>.from(row.cast<String, dynamic>());
           _entries.add(
@@ -147,8 +162,11 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
             ),
           );
         }
+      } else if (response.data is Map && response.data['error'] != null) {
+         debugPrint('Failed testcases: ${response.data['error']}');
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error loading testcases: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load test cases.')),
@@ -171,13 +189,14 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
           if (language == null || !_driverPrefixControllers.containsKey(language)) {
             continue;
           }
-          _driverPrefixControllers[language]!.text =
-              mapped['driver_prefix']?.toString() ?? '';
-          _driverSuffixControllers[language]!.text =
-              mapped['driver_suffix']?.toString() ?? '';
+          _driverPrefixControllers[language]!.text = mapped['driver_prefix']?.toString() ?? '';
+          _driverSuffixControllers[language]!.text = mapped['driver_suffix']?.toString() ?? '';
         }
+      } else if (response.data is Map && response.data['error'] != null) {
+         debugPrint('Failed drivers: ${response.data['error']}');
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error loading drivers: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load driver code.')),
@@ -245,6 +264,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
       'follow_up': _followUpCtrl.text.trim().isEmpty
           ? null
           : _followUpCtrl.text.trim(),
+      'is_contest_exclusive': _isContestExclusive,
       'code_stubs': {
         'cpp': _stubControllers['cpp']!.text,
         'python': _stubControllers['python']!.text,
@@ -303,25 +323,27 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
         title: Text(title),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isSaving || state.isLoading ? null : _onSave,
+        onPressed: _isSaving || state.isLoading || !_isInit ? null : _onSave,
         backgroundColor: const Color(0xFF2CBB5D),
         icon: const Icon(Icons.save),
         label: const Text('Save Problem'),
       ),
-      body: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              _buildBasicInfoSection(context),
-              _buildTestCasesSection(),
-              _buildStarterCodeSection(),
-              _buildDriverCodeSection(),
-              const SizedBox(height: 80),
-            ],
-          ),
-        ),
-      ),
+      body: state.isLoading || !_isInit
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C3CE1)))
+          : SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    _buildBasicInfoSection(context),
+                    _buildTestCasesSection(),
+                    _buildStarterCodeSection(),
+                    _buildDriverCodeSection(),
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -409,6 +431,13 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
                   hintText: 'Could you do it in O(n log n)?',
                   border: OutlineInputBorder(),
                 ),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                title: const Text('Contest Exclusive'),
+                subtitle: const Text('Hide from main problem list'),
+                value: _isContestExclusive,
+                onChanged: (val) => setState(() => _isContestExclusive = val),
               ),
               const SizedBox(height: 12),
               _buildHintsSection(),

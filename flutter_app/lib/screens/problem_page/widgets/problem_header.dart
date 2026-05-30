@@ -69,7 +69,7 @@ class ProblemHeader extends StatelessWidget {
                 Icons.label_outline,
                 'Topics',
                 () {
-                  final topics = problem.topics ?? const <String>[];
+                  final topics = problem.topics;
                   showModalBottomSheet<void>(
                     context: context,
                     builder: (ctx) {
@@ -93,7 +93,7 @@ class ProblemHeader extends StatelessWidget {
                 Icons.business_outlined,
                 'Companies',
                 () {
-                  final companies = problem.companies ?? const <String>[];
+                  final companies = problem.companies;
                   showModalBottomSheet<void>(
                     context: context,
                     builder: (ctx) {

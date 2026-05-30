@@ -16,6 +16,7 @@ class Problem {
   final String? hint;
   final CodeStubs? codeStubs;
   final bool? isSolved;
+  final bool isContestExclusive;
 
   Problem({
     required this.id,
@@ -33,6 +34,7 @@ class Problem {
     this.hint,
     this.codeStubs,
     this.isSolved,
+    this.isContestExclusive = false,
   });
 
   factory Problem.fromJson(Map<String, dynamic> json) {
@@ -83,6 +85,7 @@ class Problem {
           ? CodeStubs.fromJson(json['code_stubs'] as Map<String, dynamic>)
           : null,
       isSolved: json['is_solved'] as bool?,
+      isContestExclusive: json['is_contest_exclusive'] == true,
     );
   }
 
@@ -103,6 +106,7 @@ class Problem {
       'hint': hint,
       'code_stubs': codeStubs?.toJson(),
       'is_solved': isSolved,
+      'is_contest_exclusive': isContestExclusive,
     };
   }
 

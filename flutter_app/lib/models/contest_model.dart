@@ -26,10 +26,12 @@ class ContestModel {
       id: json['id'] as int,
       title: json['title'] as String,
       description: json['description'] as String?,
-      startTime: DateTime.parse(json['start_time'] as String),
-      endTime: DateTime.parse(json['end_time'] as String),
-      status: json['status'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      startTime: DateTime.parse((json['start_time'] ?? json['starts_at'] ?? '2000-01-01T00:00:00Z') as String),
+      endTime: DateTime.parse((json['end_time'] ?? json['ends_at'] ?? '2000-01-01T00:00:00Z') as String),
+      status: json['status'] as String? ?? 'upcoming',
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
       problems: (json['problems'] as List?)
           ?.map((p) => ContestProblem.fromJson(p as Map<String, dynamic>))
           .toList(),

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuth } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAdmin.js';
 import { dbPool } from '../index.js';
 
@@ -49,18 +49,18 @@ function normalizeProblemRow(row) {
   };
 }
 
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: 'Missing user context', code: 'AUTH_ERROR' });
-    }
+    const userId = req.user?.id || 0;
+
+    const isAdmin = req.user?.role === 'admin';
 
     const result = await dbPool.query(
       `SELECT p.id,
               p.title,
               p.difficulty,
               p.topics,
+              p.is_contest_exclusive,
               EXISTS (
                 SELECT 1
                 FROM submissions s
@@ -69,13 +69,15 @@ router.get('/', authMiddleware, async (req, res) => {
                   AND s.verdict = 'accepted'
               ) AS is_solved
        FROM problems p
+       WHERE (p.is_contest_exclusive = false OR $2 = true)
        ORDER BY p.id ASC`,
-      [userId]
+      [userId, isAdmin]
     );
 
     return res.json(result.rows.map((row) => ({
       ...row,
       topics: row.topics ?? [],
+      is_contest_exclusive: row.is_contest_exclusive === true,
       is_solved: row.is_solved === true,
     })));
   } catch (error) {
@@ -84,7 +86,7 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const isAdmin = req.user?.role === 'admin';
@@ -99,6 +101,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
               p.hints,
               p.follow_up,
               p.code_stubs,
+              p.is_contest_exclusive,
               COALESCE(
                 (
                   SELECT json_agg(
@@ -157,6 +160,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       hints: problem.hints,
       follow_up: problem.follow_up,
       code_stubs: problem.code_stubs,
+      is_contest_exclusive: problem.is_contest_exclusive === true,
       examples: problem.examples || [],
       hidden_testcases: problem.hidden_testcases ?? null,
     });
@@ -178,6 +182,7 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
       follow_up: followUp,
       code_stubs: codeStubsRaw,
       testCases,
+      is_contest_exclusive,
     } = req.body;
 
     const normalizedDifficulty = typeof difficulty === 'string'
@@ -221,10 +226,11 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
            constraints,
            hints,
            follow_up,
-           code_stubs
+           code_stubs,
+           is_contest_exclusive
          )
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb)
-         RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs`,
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9)
+         RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs, is_contest_exclusive`,
         [
           title,
           description,
@@ -234,6 +240,7 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
           JSON.stringify(normalizedHints ?? []),
           followUp ?? null,
           JSON.stringify(codeStubs ?? {}),
+          is_contest_exclusive === true,
         ]
       );
 
@@ -288,6 +295,7 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       hints,
       follow_up: followUp,
       code_stubs: codeStubsRaw,
+      is_contest_exclusive,
     } = req.body;
 
     const normalizedDifficulty = typeof difficulty === 'string'
@@ -345,6 +353,10 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       updates.push(`code_stubs = $${paramCount++}::jsonb`);
       params.push(JSON.stringify(codeStubs));
     }
+    if (is_contest_exclusive !== undefined) {
+      updates.push(`is_contest_exclusive = $${paramCount++}`);
+      params.push(is_contest_exclusive === true);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update', code: 'INVALID_INPUT' });
@@ -356,7 +368,7 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       `UPDATE problems
        SET ${updates.join(', ')}
        WHERE id = $${paramCount}
-       RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs`,
+       RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs, is_contest_exclusive`,
       params
     );
 
