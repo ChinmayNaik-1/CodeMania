@@ -51,9 +51,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/admin/problems/create',
         name: 'createProblem',
+        builder: (context, state) => const CreateProblemScreen(),
+      ),
+      GoRoute(
+        path: '/admin/problems/:id/edit',
+        name: 'editProblem',
         builder: (context, state) {
-          final editingProblem = state.extra is ProblemModel ? state.extra as ProblemModel : null;
-          return CreateProblemScreen(editingProblem: editingProblem);
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return CreateProblemScreen(editingProblemId: id);
         },
       ),
       GoRoute(

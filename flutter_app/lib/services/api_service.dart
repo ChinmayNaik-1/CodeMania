@@ -54,21 +54,35 @@ class ApiService {
     Config.setToken(token);
   }
 
+  static void _checkResponse(Response response) {
+    if (response.statusCode != null && response.statusCode! >= 400) {
+      throw Exception('API Error ${response.statusCode}: ${response.data}');
+    }
+  }
+
   static Future<Response> get(String path,
       {Map<String, dynamic>? params}) async {
-    return _dio.get(path, queryParameters: params);
+    final response = await _dio.get(path, queryParameters: params);
+    _checkResponse(response);
+    return response;
   }
 
   static Future<Response> post(String path, {dynamic data}) async {
-    return _dio.post(path, data: data);
+    final response = await _dio.post(path, data: data);
+    _checkResponse(response);
+    return response;
   }
 
   static Future<Response> put(String path, {dynamic data}) async {
-    return _dio.put(path, data: data);
+    final response = await _dio.put(path, data: data);
+    _checkResponse(response);
+    return response;
   }
 
   static Future<Response> delete(String path) async {
-    return _dio.delete(path);
+    final response = await _dio.delete(path);
+    _checkResponse(response);
+    return response;
   }
 
   static Future<Response> googleStart(String idToken) async {

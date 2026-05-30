@@ -10,12 +10,12 @@ import 'package:go_router/go_router.dart';
 class CreateProblemScreen extends ConsumerStatefulWidget {
   const CreateProblemScreen({
     super.key,
-    this.editingProblem,
+    this.editingProblemId,
     this.visibility,
     this.contestId,
   });
 
-  final ProblemModel? editingProblem;
+  final int? editingProblemId;
   final String? visibility;
   final int? contestId;
 
@@ -63,7 +63,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   bool _isInit = false;
   bool _isContestExclusive = false;
 
-  bool get _isEditing => widget.editingProblem != null;
+  bool get _isEditing => widget.editingProblemId != null;
 
   @override
   void initState() {
@@ -75,7 +75,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isEditing) {
-        _loadProblem(widget.editingProblem!.id);
+        _loadProblem(widget.editingProblemId!);
       } else {
         setState(() {
           _entries.add(TestCaseEntry());
@@ -111,98 +111,101 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   }
 
   Future<void> _loadProblem(int id) async {
-    final notifier = ref.read(createProblemProvider.notifier);
-    final problem = await notifier.loadProblem(id);
-    if (problem == null) return;
-
-    _titleCtrl.text = problem.title;
-    _descCtrl.text = problem.description;
-    _topicsCtrl.text = problem.topics.join(', ');
-    _constraintsCtrl.text = problem.constraints ?? '';
-    _followUpCtrl.text = problem.followUp ?? '';
-    _difficulty = _normalizeDifficulty(problem.difficulty);
-    _isContestExclusive = problem.isContestExclusive;
-
-    _hintControllers
-      ..forEach((ctrl) => ctrl.dispose())
-      ..clear();
-    for (final hint in problem.hints) {
-      _hintControllers.add(TextEditingController(text: hint));
-    }
-
-    _stubControllers['cpp']!.text = problem.codeStubs?.cpp ?? '';
-    _stubControllers['python']!.text = problem.codeStubs?.python ?? '';
-    _stubControllers['java']!.text = problem.codeStubs?.java ?? '';
-
-    await _loadTestCases(id);
-    await _loadDriverCode(id);
-
-    if (mounted) {
-      setState(() {
-        _isInit = true;
-      });
-    }
-  }
-
-  Future<void> _loadTestCases(int id) async {
-    _entries.clear();
     try {
-      final response = await ApiService.get('/api/admin/problems/$id/testcases');
-      if (response.data is List && (response.data as List).isNotEmpty) {
-        for (final row in (response.data as List).whereType<Map>()) {
-          final mapped = Map<String, dynamic>.from(row.cast<String, dynamic>());
-          _entries.add(
-            TestCaseEntry(
-              savedId: (mapped['id'] as num?)?.toInt(),
-              input: mapped['input']?.toString() ?? '',
-              output: mapped['expected_output']?.toString() ?? '',
-              explanation: mapped['explanation']?.toString() ?? '',
-              imageUrl: mapped['image_url']?.toString() ?? '',
-              isHidden: mapped['is_hidden'] == true,
-            ),
-          );
-        }
-      } else if (response.data is Map && response.data['error'] != null) {
-         debugPrint('Failed testcases: ${response.data['error']}');
+      final notifier = ref.read(createProblemProvider.notifier);
+      final problem = await notifier.loadProblem(id);
+      if (problem == null) {
+        setState(() { _isInit = true; });
+        return;
       }
-    } catch (e) {
-      debugPrint('Error loading testcases: $e');
+
+      final testcases = await _fetchTestcases(id);
+      final drivers = await _fetchDrivers(id);
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load test cases.')),
-        );
-      }
-    }
+        setState(() {
+          _titleCtrl.text = problem.title;
+          _descCtrl.text = problem.description;
+          _topicsCtrl.text = problem.topics.join(', ');
+          _constraintsCtrl.text = problem.constraints ?? '';
+          _followUpCtrl.text = problem.followUp ?? '';
+          _difficulty = _normalizeDifficulty(problem.difficulty);
+          _isContestExclusive = problem.isContestExclusive;
 
-    if (_entries.isEmpty) {
-      _entries.add(TestCaseEntry());
-    }
-  }
-
-  Future<void> _loadDriverCode(int id) async {
-    try {
-      final response = await ApiService.get('/api/admin/problems/$id/drivers');
-      if (response.data is Map && response.data['drivers'] is List) {
-        for (final row in (response.data['drivers'] as List).whereType<Map>()) {
-          final mapped = Map<String, dynamic>.from(row.cast<String, dynamic>());
-          final language = mapped['language']?.toString();
-          if (language == null || !_driverPrefixControllers.containsKey(language)) {
-            continue;
+          _hintControllers
+            ..forEach((ctrl) => ctrl.dispose())
+            ..clear();
+          for (final hint in problem.hints) {
+            _hintControllers.add(TextEditingController(text: hint));
           }
-          _driverPrefixControllers[language]!.text = mapped['driver_prefix']?.toString() ?? '';
-          _driverSuffixControllers[language]!.text = mapped['driver_suffix']?.toString() ?? '';
-        }
-      } else if (response.data is Map && response.data['error'] != null) {
-         debugPrint('Failed drivers: ${response.data['error']}');
+
+          _stubControllers['cpp']!.text = problem.codeStubs?.cpp ?? '';
+          _stubControllers['python']!.text = problem.codeStubs?.python ?? '';
+          _stubControllers['java']!.text = problem.codeStubs?.java ?? '';
+
+          _entries.clear();
+          _entries.addAll(testcases);
+          if (_entries.isEmpty) {
+            _entries.add(TestCaseEntry());
+          }
+
+          for (final lang in drivers.keys) {
+            if (_driverPrefixControllers.containsKey(lang)) {
+              _driverPrefixControllers[lang]!.text = drivers[lang]!['prefix'] ?? '';
+              _driverSuffixControllers[lang]!.text = drivers[lang]!['suffix'] ?? '';
+            }
+          }
+
+          _isInit = true;
+        });
       }
     } catch (e) {
-      debugPrint('Error loading drivers: $e');
       if (mounted) {
+        setState(() { _isInit = true; });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to load driver code.')),
+          SnackBar(content: Text('Failed to load problem: $e')),
         );
       }
     }
+  }
+
+  Future<List<TestCaseEntry>> _fetchTestcases(int id) async {
+    final testcases = <TestCaseEntry>[];
+    final response = await ApiService.get('/api/admin/problems/$id/testcases');
+    if (response.data is List && (response.data as List).isNotEmpty) {
+      for (final row in (response.data as List).whereType<Map>()) {
+        final mapped = Map<String, dynamic>.from(row.cast<String, dynamic>());
+        testcases.add(
+          TestCaseEntry(
+            savedId: (mapped['id'] as num?)?.toInt(),
+            input: mapped['input']?.toString() ?? '',
+            output: mapped['expected_output']?.toString() ?? '',
+            explanation: mapped['explanation']?.toString() ?? '',
+            imageUrl: mapped['image_url']?.toString() ?? '',
+            isHidden: mapped['is_hidden'] == true,
+          ),
+        );
+      }
+    }
+    return testcases;
+  }
+
+  Future<Map<String, Map<String, String>>> _fetchDrivers(int id) async {
+    final drivers = <String, Map<String, String>>{};
+    final response = await ApiService.get('/api/admin/problems/$id/drivers');
+    if (response.data is Map && response.data['drivers'] is List) {
+      for (final row in (response.data['drivers'] as List).whereType<Map>()) {
+        final mapped = Map<String, dynamic>.from(row.cast<String, dynamic>());
+        final language = mapped['language']?.toString();
+        if (language != null) {
+          drivers[language] = {
+            'prefix': mapped['driver_prefix']?.toString() ?? '',
+            'suffix': mapped['driver_suffix']?.toString() ?? '',
+          };
+        }
+      }
+    }
+    return drivers;
   }
 
   String _normalizeDifficulty(String value) {
@@ -287,7 +290,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
       entries: _entries,
       deletedIds: _deletedIds,
       driverCode: driverCode,
-      problemId: _isEditing ? widget.editingProblem!.id : null,
+      problemId: _isEditing ? widget.editingProblemId : null,
     );
     setState(() => _isSaving = false);
 

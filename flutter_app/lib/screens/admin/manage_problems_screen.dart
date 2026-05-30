@@ -84,7 +84,7 @@ class _ManageProblemsScreenState extends ConsumerState<ManageProblemsScreen> {
                       'Difficulty: ${problem.difficulty} • Tags: ${problem.tags.join(', ')}'),
                   trailing: const Icon(Icons.edit_outlined),
                   onTap: () async {
-                    await context.push('/admin/problems/create', extra: problem);
+                    await context.push('/admin/problems/${problem.id}/edit');
                     if (mounted) {
                       await _refreshProblems();
                     }
