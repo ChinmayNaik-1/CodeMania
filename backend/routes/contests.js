@@ -6,6 +6,7 @@ import { checkAndUpdateContestStatus, refreshAllContestStatuses } from '../middl
 import { getLeaderboard, recordContestSubmission } from '../services/contestService.js';
 import { getRedisClient } from '../services/leaderboardService.js';
 import { judgeSubmission } from '../services/judgeService.js';
+import { judgeContestSubmission, runContestSample } from '../services/contestJudgeService.js';
 import { submissionQueue } from '../services/submissionQueue.js';
 
 const router = Router();
@@ -420,14 +421,12 @@ router.post('/:id/problems/:problemId/submit', async (req, res) => {
   const userId = req.user.id;
   const { language, code } = req.body;
 
-  // Get team_id if team contest
   let teamId = null;
   if (contest.contest_type === 'team') {
     const myTeam = await getMyTeamInContest(contestId, userId);
     if (!myTeam) return res.status(403).json({ error: 'Not registered in a team' });
     teamId = myTeam.team_id;
   } else {
-    // Solo — check registered
     const reg = await dbPool.query(
       `SELECT 1 FROM contest_registrations WHERE contest_id = $1 AND user_id = $2`,
       [contestId, userId]
@@ -435,49 +434,92 @@ router.post('/:id/problems/:problemId/submit', async (req, res) => {
     if (reg.rows.length === 0) return res.status(403).json({ error: 'Not registered for this contest' });
   }
 
-  // Get language version
-  const langVersionMap = {
-    python: '3.10.0', javascript: '18.15.0', java: '15.0.2', cpp: '10.2.0', c: '10.2.0',
-  };
-  const version = langVersionMap[language?.toLowerCase()] ?? null;
+  try {
+    const io = req.app.get('io');
+    const result = await judgeContestSubmission(
+      contestId, problemId, userId, teamId, language, code, io
+    );
 
-  // Insert to global submissions table with contest_id + team_id
-  const submResult = await dbPool.query(
-    `INSERT INTO submissions (user_id, problem_id, contest_id, team_id, language, code, verdict, status)
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', 'Pending')
-     RETURNING id`,
-    [userId, problemId, contestId, teamId, language, code]
-  );
-  const submissionId = submResult.rows[0].id;
-
-  // Enqueue for judging
-  const userResult = await dbPool.query(`SELECT username FROM users WHERE id = $1`, [userId]);
-  const username = userResult.rows[0]?.username ?? '';
-
-  await submissionQueue.add({
-    submissionId,
-    userId,
-    username,
-    problemId,
-    contestId,
-    teamId,
-    language: language?.toLowerCase(),
-    version,
-    code,
-  });
-
-  res.json({ submission_id: submissionId });
+    res.json({
+      verdict: result.verdict,
+      score_awarded: result.scoreAwarded,
+      first_solve: result.firstSolve,
+      message: result.verdict === 'Accepted'
+        ? result.firstSolve
+          ? `Accepted! +${result.scoreAwarded} points`
+          : 'Accepted! (problem already solved by team)'
+        : result.verdict
+    });
+  } catch (err) {
+    console.error('Run/submit route error:', err.message);
+    return res.status(500).json({
+      error: 'Execution failed',
+      detail: err.message,
+      pistonError: err.response?.data ?? null,
+    });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/contests/:id/problems/:problemId/run
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/:id/problems/:problemId/run', async (req, res) => {
+  const contestId = parseInt(req.params.id, 10);
   const problemId = parseInt(req.params.problemId, 10);
   const { language, code } = req.body;
 
-  const result = await judgeSubmission(code, language, null, problemId, dbPool, { sampleOnly: true });
-  res.json(result);
+  const contest = await getContestOrThrow(contestId);
+  const userId = req.user.id;
+  
+  if (contest.contest_type === 'team') {
+    const myTeam = await getMyTeamInContest(contestId, userId);
+    if (!myTeam) return res.status(403).json({ error: 'Not registered in a team' });
+  } else {
+    const reg = await dbPool.query(
+      `SELECT 1 FROM contest_registrations WHERE contest_id = $1 AND user_id = $2`,
+      [contestId, userId]
+    );
+    if (reg.rows.length === 0) return res.status(403).json({ error: 'Not registered for this contest' });
+  }
+
+  try {
+    const results = await runContestSample(problemId, language, code);
+    res.json({ results });
+  } catch (err) {
+    console.error('Run/submit route error:', err.message);
+    return res.status(500).json({
+      error: 'Execution failed',
+      detail: err.message,
+      pistonError: err.response?.data ?? null,
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/contests/:id/problems/:problemId/submissions
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/:id/problems/:problemId/submissions', async (req, res) => {
+  const contestId = parseInt(req.params.id, 10);
+  const problemId = parseInt(req.params.problemId, 10);
+  const userId = req.user.id;
+  const isAdmin = req.user.role === 'admin';
+
+  let query = `
+    SELECT id, username, team_name, verdict, language, score_awarded, first_solve, time_ms, submitted_at
+    FROM contest_submissions
+    WHERE contest_id = $1 AND problem_id = $2
+  `;
+  const params = [contestId, problemId];
+
+  if (!isAdmin) {
+    query += ` AND user_id = $3`;
+    params.push(userId);
+  }
+
+  query += ` ORDER BY submitted_at DESC`;
+
+  const result = await dbPool.query(query, params);
+  res.json(result.rows);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

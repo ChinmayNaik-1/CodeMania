@@ -1,1 +1,1 @@
-import 'dart:convert'; void main() { final map = {'id': 1, 'username': 'test', 'avatar_url': null, 'solved_count': 0, 'current_streak': 0, 'is_online': false}; print(map.runtimeType); try { void takeMap(Map<String, dynamic> m) { print('success'); } takeMap(map); } catch(e) { print('ERROR: '); } }
+void main() { final map = {'id': 1, 'username': 'test', 'avatar_url': null, 'solved_count': 0, 'current_streak': 0, 'is_online': false}; print(map.runtimeType); try { void takeMap(Map<String, dynamic> m) { print('success'); } takeMap(map); } catch(e) { print('ERROR: '); } }

@@ -54,4 +54,67 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// ─── GET /api/users/:userId/submission-heatmap ───────────────────────────────
+router.get('/:userId/submission-heatmap', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  if (req.user.id !== userId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  try {
+    const result = await dbPool.query(
+      `SELECT
+         DATE(created_at AT TIME ZONE 'UTC') AS day,
+         COUNT(*) AS submission_count
+       FROM submissions
+       WHERE
+         user_id = $1
+         AND created_at >= NOW() - INTERVAL '365 days'
+       GROUP BY day
+       ORDER BY day;`,
+      [userId]
+    );
+
+    const heatmap = {};
+    let totalSubmissions = 0;
+    const totalActiveDays = result.rows.length;
+
+    for (const row of result.rows) {
+      const d = new Date(row.day);
+      const key = d.toISOString().split('T')[0];
+      const count = parseInt(row.submission_count, 10);
+      heatmap[key] = count;
+      totalSubmissions += count;
+    }
+
+    let maxStreak = 0;
+    const keys = Object.keys(heatmap).sort();
+    if (keys.length > 0) {
+      let currentRun = 1;
+      maxStreak = 1;
+      for (let i = 1; i < keys.length; i++) {
+        const prev = new Date(keys[i - 1]);
+        const curr = new Date(keys[i]);
+        const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          currentRun++;
+          if (currentRun > maxStreak) maxStreak = currentRun;
+        } else {
+          currentRun = 1;
+        }
+      }
+    }
+
+    res.json({
+      totalSubmissions,
+      totalActiveDays,
+      maxStreak,
+      heatmap
+    });
+  } catch (err) {
+    console.error('GET /api/users/:userId/submission-heatmap error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

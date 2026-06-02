@@ -3,6 +3,7 @@ import 'package:codemania/providers/auth_provider.dart';
 import 'package:codemania/providers/problem_provider.dart';
 import 'package:codemania/features/contests/providers/contest_provider.dart';
 import 'package:codemania/core/models/contest_model.dart';
+import 'package:codemania/features/contests/screens/contests_screen.dart';
 import 'package:codemania/screens/user/problem_list_screen.dart';
 
 import 'package:codemania/services/socket_service.dart';
@@ -44,7 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         embedded: true,
         onOpenProblem: _openProblem,
       ),
-      const SizedBox.shrink(),
+      const ContestsScreen(embedded: true),
       const SizedBox.shrink(),
     ];
 

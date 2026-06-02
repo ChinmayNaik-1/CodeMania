@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class Problem {
   final int id;
+  final int? problemNumber;
   final String title;
   final String difficulty;
   final String description;
@@ -20,6 +21,7 @@ class Problem {
 
   Problem({
     required this.id,
+    this.problemNumber,
     required this.title,
     required this.difficulty,
     required this.description,
@@ -65,6 +67,7 @@ class Problem {
 
     return Problem(
       id: (json['id'] as num?)?.toInt() ?? 0,
+      problemNumber: (json['problem_number'] as num?)?.toInt(),
       title: (json['title'] as String?) ?? 'Untitled Problem',
       difficulty: (json['difficulty'] as String?) ?? 'Easy',
       description: (json['description'] as String?) ?? '',
@@ -92,6 +95,7 @@ class Problem {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'problem_number': problemNumber,
       'title': title,
       'difficulty': difficulty,
       'description': description,

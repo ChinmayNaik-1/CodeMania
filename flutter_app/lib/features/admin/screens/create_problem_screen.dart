@@ -3,6 +3,7 @@ import 'package:codemania/features/admin/widgets/testcase_editor_section.dart';
 import 'package:codemania/models/problem_model.dart';
 import 'package:codemania/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   final _formKey = GlobalKey<FormState>();
 
   final _titleCtrl = TextEditingController();
+  final _problemNumberCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _topicsCtrl = TextEditingController();
   final _constraintsCtrl = TextEditingController();
@@ -88,6 +90,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _problemNumberCtrl.dispose();
     _descCtrl.dispose();
     _topicsCtrl.dispose();
     _constraintsCtrl.dispose();
@@ -125,6 +128,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
       if (mounted) {
         setState(() {
           _titleCtrl.text = problem.title;
+          _problemNumberCtrl.text = problem.problemNumber?.toString() ?? '';
           _descCtrl.text = problem.description;
           _topicsCtrl.text = problem.topics.join(', ');
           _constraintsCtrl.text = problem.constraints ?? '';
@@ -256,6 +260,8 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
 
     final payload = {
       'title': _titleCtrl.text.trim(),
+      if (_problemNumberCtrl.text.trim().isNotEmpty)
+        'problem_number': int.tryParse(_problemNumberCtrl.text.trim()),
       'description': _descCtrl.text.trim(),
       'difficulty': _difficulty.toLowerCase(),
       'topics': _parseTopics(),
@@ -296,9 +302,21 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
 
     if (result == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save problem.')),
-        );
+        final error = ref.read(createProblemProvider).error;
+        final errorStr = error?.toString() ?? 'Failed to save problem.';
+        if (errorStr.contains('problem_number already exists')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Warning: Problem Number is already in use.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorStr)),
+          );
+        }
       }
       return;
     }
@@ -318,7 +336,7 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
   Widget build(BuildContext context) {
     final state = ref.watch(createProblemProvider);
     final title = _isEditing
-        ? 'Edit Problem: ${state.value?.title ?? '...'}'
+        ? 'Edit Problem: ${state.valueOrNull?.title ?? '...'}'
         : 'Create Problem';
 
     return Scaffold(
@@ -369,8 +387,19 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
                     (value == null || value.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 12),
+              TextFormField(
+                controller: _problemNumberCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Problem Number',
+                  hintText: 'Auto-assigned if left blank',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _difficulty,
+                initialValue: _difficulty,
                 decoration: InputDecoration(
                   labelText: 'Difficulty *',
                   border: const OutlineInputBorder(),

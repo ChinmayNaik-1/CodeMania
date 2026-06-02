@@ -83,7 +83,7 @@ class _StarterCodeTabState extends State<StarterCodeTab> {
           children: [
             TabBar(
               isScrollable: true,
-              onTap: (index) => _setLanguage(_languages[index]['key']! as String),
+              onTap: (index) => _setLanguage(_languages[index]['key']!),
               tabs: _languages
                   .map((lang) => Tab(text: lang['label'] as String))
                   .toList(),

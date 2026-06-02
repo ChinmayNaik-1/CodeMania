@@ -61,6 +61,7 @@ router.get('/', optionalAuth, async (req, res) => {
               p.difficulty,
               p.topics,
               p.is_contest_exclusive,
+              p.problem_number,
               EXISTS (
                 SELECT 1
                 FROM submissions s
@@ -70,7 +71,7 @@ router.get('/', optionalAuth, async (req, res) => {
               ) AS is_solved
        FROM problems p
        WHERE (p.is_contest_exclusive = false OR $2 = true)
-       ORDER BY p.id ASC`,
+       ORDER BY p.problem_number ASC`,
       [userId, isAdmin]
     );
 
@@ -78,6 +79,7 @@ router.get('/', optionalAuth, async (req, res) => {
       ...row,
       topics: row.topics ?? [],
       is_contest_exclusive: row.is_contest_exclusive === true,
+      problem_number: row.problem_number,
       is_solved: row.is_solved === true,
     })));
   } catch (error) {
@@ -89,6 +91,7 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user?.id || -1;
     const isAdmin = req.user?.role === 'admin';
 
     const result = await dbPool.query(
@@ -102,6 +105,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
               p.follow_up,
               p.code_stubs,
               p.is_contest_exclusive,
+              p.problem_number,
+              EXISTS (
+                SELECT 1
+                FROM submissions s
+                WHERE s.problem_id = p.id
+                  AND s.user_id = $2
+                  AND s.verdict = 'accepted'
+              ) AS is_solved,
               COALESCE(
                 (
                   SELECT json_agg(
@@ -119,7 +130,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
                 ),
                 '[]'::json
               ) AS examples,
-              CASE WHEN $2
+              CASE WHEN $3
                 THEN COALESCE(
                   (
                     SELECT json_agg(
@@ -141,7 +152,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
               END AS hidden_testcases
        FROM problems p
        WHERE p.id = $1`,
-      [id, isAdmin]
+      [id, userId, isAdmin]
     );
 
     if (result.rows.length === 0) {
@@ -159,8 +170,10 @@ router.get('/:id', optionalAuth, async (req, res) => {
       constraints: problem.constraints,
       hints: problem.hints,
       follow_up: problem.follow_up,
-      code_stubs: problem.code_stubs,
+      code_stubs: problem.code_stubs ?? {},
       is_contest_exclusive: problem.is_contest_exclusive === true,
+      problem_number: problem.problem_number,
+      is_solved: result.rows[0].is_solved === true,
       examples: problem.examples || [],
       hidden_testcases: problem.hidden_testcases ?? null,
     });
@@ -183,6 +196,7 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
       code_stubs: codeStubsRaw,
       testCases,
       is_contest_exclusive,
+      problem_number,
     } = req.body;
 
     const normalizedDifficulty = typeof difficulty === 'string'
@@ -217,6 +231,19 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
     try {
       await client.query('BEGIN');
 
+      let finalProblemNumber = problem_number;
+      if (finalProblemNumber !== undefined) {
+        // Validate uniqueness if provided
+        const checkNum = await client.query('SELECT 1 FROM problems WHERE problem_number = $1', [finalProblemNumber]);
+        if (checkNum.rows.length > 0) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ error: 'problem_number already exists', code: 'INVALID_INPUT' });
+        }
+      } else {
+        const maxNumResult = await client.query('SELECT COALESCE(MAX(problem_number), 0) + 1 AS next_num FROM problems');
+        finalProblemNumber = maxNumResult.rows[0].next_num;
+      }
+
       const insertResult = await client.query(
         `INSERT INTO problems (
            title,
@@ -227,10 +254,11 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
            hints,
            follow_up,
            code_stubs,
-           is_contest_exclusive
+           is_contest_exclusive,
+           problem_number
          )
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9)
-         RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs, is_contest_exclusive`,
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9, $10)
+         RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs, is_contest_exclusive, problem_number`,
         [
           title,
           description,
@@ -241,6 +269,7 @@ router.post('/', authMiddleware, requireAdmin, async (req, res) => {
           followUp ?? null,
           JSON.stringify(codeStubs ?? {}),
           is_contest_exclusive === true,
+          finalProblemNumber,
         ]
       );
 
@@ -296,6 +325,7 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       follow_up: followUp,
       code_stubs: codeStubsRaw,
       is_contest_exclusive,
+      problem_number,
     } = req.body;
 
     const normalizedDifficulty = typeof difficulty === 'string'
@@ -357,6 +387,14 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       updates.push(`is_contest_exclusive = $${paramCount++}`);
       params.push(is_contest_exclusive === true);
     }
+    if (problem_number !== undefined) {
+      const checkNum = await dbPool.query('SELECT 1 FROM problems WHERE problem_number = $1 AND id != $2', [problem_number, id]);
+      if (checkNum.rows.length > 0) {
+        return res.status(400).json({ error: 'problem_number already exists', code: 'INVALID_INPUT' });
+      }
+      updates.push(`problem_number = $${paramCount++}`);
+      params.push(problem_number);
+    }
 
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No fields to update', code: 'INVALID_INPUT' });
@@ -368,7 +406,7 @@ router.put('/:id', authMiddleware, requireAdmin, async (req, res) => {
       `UPDATE problems
        SET ${updates.join(', ')}
        WHERE id = $${paramCount}
-       RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs, is_contest_exclusive`,
+       RETURNING id, title, description, difficulty, topics, constraints, hints, follow_up, code_stubs, is_contest_exclusive, problem_number`,
       params
     );
 

@@ -235,7 +235,7 @@ class _ProblemTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
-        title: Text(problem.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        title: Text('${problem.problemNumber ?? problem.id}. ${problem.title}', style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Row(

@@ -269,7 +269,7 @@ class _DriverCodeEditorSheetState extends State<DriverCodeEditorSheet> {
                         .map(
                           (option) => DropdownMenuItem(
                             value: option['value'],
-                            child: Text(option['label']! as String),
+                            child: Text(option['label']!),
                           ),
                         )
                         .toList(),

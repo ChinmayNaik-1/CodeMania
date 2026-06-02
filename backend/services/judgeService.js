@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { processContestSubmission } from './icpcService.js';
 
-const PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
+let PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
+if (PISTON_URL.includes('/api/v2/execute/api/v2/execute')) {
+  PISTON_URL = PISTON_URL.replace('/api/v2/execute/api/v2/execute', '/api/v2/execute');
+}
 const RUNTIME_CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_RUNTIME_FALLBACK = {
   python: '3.10.0',
@@ -313,6 +316,20 @@ export async function buildExecutableCode(problemId, language, userCode, dbPool)
   }
 }
 
+function normalizeLang(lang) {
+  const map = {
+    'cpp': 'c++',
+    'c++': 'c++',
+    'C++': 'c++',
+    'python': 'python',
+    'python3': 'python',
+    'java': 'java',
+    'javascript': 'javascript',
+    'js': 'javascript',
+  };
+  return map[lang] ?? lang.toLowerCase();
+}
+
 export async function runAgainstTestCase(code, language, version, stdin) {
   try {
     const runMemoryLimit = parsePistonMemoryLimit(
@@ -328,21 +345,24 @@ export async function runAgainstTestCase(code, language, version, stdin) {
     if (!primaryRuntime.version) {
       throw new Error(`Unsupported runtime for language: ${language}`);
     }
-    const requestBody = (runtime) => ({
-      language: runtime.language,
-      version: runtime.version,
-      files: [
-        {
-          name: getSourceFileName(runtime.language),
-          content: code,
-        },
-      ],
-      stdin,
-      run_timeout: getRunTimeoutMs(runtime.language),
-      compile_timeout: getCompileTimeoutMs(runtime.language),
-      run_memory_limit: runMemoryLimit,
-      compile_memory_limit: compileMemoryLimit,
-    });
+    const requestBody = (runtime) => {
+      const normLang = normalizeLang(runtime.language || language);
+      return {
+        language: normLang,
+        version: runtime.version || '*',
+        files: [
+          {
+            name: normLang === 'c++' ? 'main.cpp' : getSourceFileName(runtime.language),
+            content: code,
+          },
+        ],
+        stdin,
+        run_timeout: getRunTimeoutMs(runtime.language),
+        compile_timeout: getCompileTimeoutMs(runtime.language),
+        run_memory_limit: runMemoryLimit,
+        compile_memory_limit: compileMemoryLimit,
+      };
+    };
 
     let response;
 
@@ -360,11 +380,33 @@ export async function runAgainstTestCase(code, language, version, stdin) {
           fallbackRuntime.version !== primaryRuntime.version;
 
         if (fallbackRuntime.version && isDifferent) {
-          response = await axios.post(PISTON_URL, requestBody(fallbackRuntime));
+          try {
+            response = await axios.post(PISTON_URL, requestBody(fallbackRuntime));
+          } catch (fallbackError) {
+            console.error('=== PISTON ERROR (Fallback) ===');
+            console.error('URL called:', PISTON_URL);
+            console.error('Payload sent:', JSON.stringify(requestBody(fallbackRuntime), null, 2));
+            console.error('Status:', fallbackError.response?.status);
+            console.error('Response body:', JSON.stringify(fallbackError.response?.data, null, 2));
+            console.error('Message:', fallbackError.message);
+            throw fallbackError;
+          }
         } else {
+          console.error('=== PISTON ERROR ===');
+          console.error('URL called:', PISTON_URL);
+          console.error('Payload sent:', JSON.stringify(requestBody(primaryRuntime), null, 2));
+          console.error('Status:', error.response?.status);
+          console.error('Response body:', JSON.stringify(error.response?.data, null, 2));
+          console.error('Message:', error.message);
           throw error;
         }
       } else {
+        console.error('=== PISTON ERROR ===');
+        console.error('URL called:', PISTON_URL);
+        console.error('Payload sent:', JSON.stringify(requestBody(primaryRuntime), null, 2));
+        console.error('Status:', error.response?.status);
+        console.error('Response body:', JSON.stringify(error.response?.data, null, 2));
+        console.error('Message:', error.message);
         throw error;
       }
     }

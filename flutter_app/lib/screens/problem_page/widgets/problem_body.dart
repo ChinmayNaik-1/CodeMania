@@ -23,7 +23,7 @@ class ProblemBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${problem.id}. ${problem.title}',
+              '${problem.problemNumber ?? problem.id}. ${problem.title}',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,

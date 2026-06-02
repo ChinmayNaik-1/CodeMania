@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:codemania/features/friends/providers/friends_provider.dart';
 import 'package:codemania/core/models/friend_model.dart';
-import 'package:codemania/core/models/activity_model.dart';
 import 'package:codemania/models/friend_request.dart';
 import 'package:codemania/widgets/app_sidebar.dart';
 import 'package:codemania/services/api_service.dart';

@@ -8,6 +8,21 @@ const router = Router();
 
 router.use(authMiddleware, requireAdmin);
 
+router.delete('/problems/:problemId', async (req, res) => {
+  try {
+    const problemId = parseInt(req.params.problemId, 10);
+    if (Number.isNaN(problemId)) {
+      return res.status(400).json({ error: 'Invalid problemId', code: 'INVALID_INPUT' });
+    }
+    
+    await dbPool.query('DELETE FROM problems WHERE id = $1', [problemId]);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Delete problem error:', error);
+    return res.status(500).json({ error: 'Failed to delete problem', code: 'ADMIN_PROBLEM_DELETE_ERROR' });
+  }
+});
+
 router.post('/problems/:problemId/driver', async (req, res) => {
   try {
     const problemId = parseInt(req.params.problemId, 10);

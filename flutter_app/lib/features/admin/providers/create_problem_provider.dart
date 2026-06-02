@@ -14,6 +14,7 @@ class CreateProblemNotifier extends StateNotifier<AsyncValue<ProblemModel?>> {
       state = AsyncValue.data(problem);
       return problem;
     } catch (error, stack) {
+      print('Load problem error: $error\n$stack');
       state = AsyncValue.error(error, stack);
       return null;
     }

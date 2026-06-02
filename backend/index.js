@@ -101,6 +101,7 @@ const io = new Server(httpServer, {
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'codemania_dev_secret';
+app.set('io', io);
 
 io.use((socket, next) => {
   const authHeader =
@@ -208,7 +209,10 @@ initPresenceSocket(io);
 initSubmissionQueue(io, dbPool);
 
 async function checkPistonHealth() {
-  const pistonExecuteUrl = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
+  let pistonExecuteUrl = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
+  if (pistonExecuteUrl.includes('/api/v2/execute/api/v2/execute')) {
+    pistonExecuteUrl = pistonExecuteUrl.replace('/api/v2/execute/api/v2/execute', '/api/v2/execute');
+  }
   const pistonRuntimesUrl = pistonExecuteUrl.replace(/\/execute\/?$/, '/runtimes');
 
   try {
@@ -234,7 +238,8 @@ async function startServer() {
     httpServer.listen(PORT, () => {
       console.log(`✓ Server running on http://localhost:${PORT}`);
       console.log(`✓ Socket.IO server ready for real-time events`);
-      console.log(`✓ Piston Judge API: ${process.env.PISTON_URL}`);
+      console.log('PISTON_URL from env:', process.env.PISTON_URL);
+      console.log('Final Piston endpoint:', process.env.PISTON_URL?.includes('/api/v2') ? process.env.PISTON_URL : `${process.env.PISTON_URL}/api/v2/execute`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

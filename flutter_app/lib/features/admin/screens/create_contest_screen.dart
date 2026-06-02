@@ -131,6 +131,7 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
     setState(() {
       _problems.add(_ProblemEntry(
         id: p['id'] as int,
+        problemNumber: (p['problem_number'] as num?)?.toInt(),
         title: p['title'] as String,
         difficulty: difficulty,
         points: defaultPoints,
@@ -300,6 +301,7 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
               children: [
                 TextFormField(
                   controller: _titleCtrl,
+                  style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 14),
                   decoration: _inputDec('Contest Title'),
                   validator: (v) =>
                       v == null || v.trim().isEmpty ? 'Required' : null,
@@ -307,6 +309,7 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _descCtrl,
+                  style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 14),
                   minLines: 3,
                   maxLines: 6,
                   decoration: _inputDec('Description (optional)'),
@@ -388,8 +391,10 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                 // Search bar
                 TextField(
                   controller: _searchCtrl,
+                  style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Search problems to add…',
+                    hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),
                     prefixIcon:
                         const Icon(Icons.search, color: _kTextSec),
                     suffixIcon: _searching
@@ -404,10 +409,17 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: const Color(0xFFF5F3FF),
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none),
+                        borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE0E0E0))),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _kPrimary, width: 2)),
                   ),
                   onChanged: _searchProblems,
                 ),
@@ -424,8 +436,8 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                       children: _searchResults.map((p) {
                         final diff = p['difficulty'] as String? ?? 'medium';
                         return ListTile(
-                          title: Text(p['title'] as String,
-                              style: const TextStyle(fontSize: 14)),
+                          title: Text("${p['problem_number'] ?? p['id']}. ${p['title']}",
+                              style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 14)),
                           leading: _DiffBadge(difficulty: diff),
                           trailing: IconButton(
                             onPressed: () {
@@ -484,8 +496,9 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                                   color: _kTextSec, fontSize: 12)),
                           const SizedBox(width: 8),
                           Expanded(
-                              child: Text(p.title,
+                              child: Text("${p.problemNumber ?? p.id}. ${p.title}",
                                   style: const TextStyle(
+                                      color: Color(0xFF1A1A2E),
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14))),
                           _DiffBadge(difficulty: p.difficulty),
@@ -494,17 +507,29 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
                             width: 72,
                             child: TextFormField(
                               initialValue: p.points.toString(),
+                              style: const TextStyle(color: Color(0xFF1A1A2E), fontSize: 14),
                               keyboardType: TextInputType.number,
                               textAlign: TextAlign.center,
                               decoration: InputDecoration(
                                 hintText: 'pts',
+                                hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),
+                                filled: true,
+                                fillColor: Colors.white,
                                 contentPadding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 6),
                                 isDense: true,
                                 border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(6),
                                     borderSide: const BorderSide(
-                                        color: Color(0xFFE5E5F0))),
+                                        color: Color(0xFFE0E0E0))),
+                                enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: const BorderSide(
+                                        color: Color(0xFFE0E0E0))),
+                                focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: const BorderSide(
+                                        color: _kPrimary, width: 2)),
                               ),
                               onChanged: (v) {
                                 final pts = int.tryParse(v) ?? p.points;
@@ -535,16 +560,22 @@ class _CreateContestScreenState extends ConsumerState<CreateContestScreen> {
 
   InputDecoration _inputDec(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: _kTextSec),
+        labelStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+        hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),
         filled: true,
-        fillColor: const Color(0xFFF5F3FF),
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: _kPrimary),
+          borderSide: const BorderSide(color: _kPrimary, width: 2),
         ),
       );
 }
@@ -638,11 +669,11 @@ class _DateTimeTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F3FF),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E5F0)),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
         ),
         child: Row(children: [
           const Icon(Icons.calendar_today, size: 18, color: _kPrimary),
@@ -702,6 +733,7 @@ class _DiffBadge extends StatelessWidget {
 
 class _ProblemEntry {
   final int id;
+  final int? problemNumber;
   final String title;
   final String difficulty;
   final int points;
@@ -709,6 +741,7 @@ class _ProblemEntry {
 
   const _ProblemEntry({
     required this.id,
+    this.problemNumber,
     required this.title,
     required this.difficulty,
     required this.points,
@@ -717,6 +750,7 @@ class _ProblemEntry {
 
   _ProblemEntry copyWith({int? points, int? order}) => _ProblemEntry(
         id: id,
+        problemNumber: problemNumber,
         title: title,
         difficulty: difficulty,
         points: points ?? this.points,

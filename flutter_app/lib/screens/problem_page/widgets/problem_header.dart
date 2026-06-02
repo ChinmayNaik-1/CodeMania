@@ -25,7 +25,7 @@ class ProblemHeader extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '${problem.id}. ${problem.title}',
+                  '${problem.problemNumber ?? problem.id}. ${problem.title}',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,

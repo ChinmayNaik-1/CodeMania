@@ -28,8 +28,8 @@ CREATE TABLE contests (
   contest_type     VARCHAR(10) NOT NULL DEFAULT 'solo'
                    CHECK (contest_type IN ('solo','team')),
   max_team_size    INT DEFAULT 1,
-  start_time       TIMESTAMP NOT NULL,
-  end_time         TIMESTAMP NOT NULL,
+  start_time       TIMESTAMPTZ NOT NULL,
+  end_time         TIMESTAMPTZ NOT NULL,
   status           VARCHAR(10) NOT NULL DEFAULT 'draft'
                    CHECK (status IN ('draft','upcoming','live','ended')),
   created_by       INT REFERENCES users(id),

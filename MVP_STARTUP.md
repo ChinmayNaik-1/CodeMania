@@ -101,7 +101,7 @@ Set-Location D:\MAD\codemania\flutter_app; flutter run -d chrome --web-port 5000
 ```powershell
 # Two-line (equivalent)
 cd D:\MAD\codemania\flutter_app
-flutter run -d chrome --web-port 5000
+flutter run -d chrome --web-port 5001
 ```
 
 If port 5000 is busy, run this first and then start again:

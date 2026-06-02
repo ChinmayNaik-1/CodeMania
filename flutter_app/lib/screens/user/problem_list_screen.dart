@@ -403,7 +403,7 @@ class _ProblemTable extends StatelessWidget {
                       SizedBox(
                         width: 70,
                         child: Text(
-                          '${problem.id}',
+                          '${problem.problemNumber ?? problem.id}',
                           style: const TextStyle(
                             color: Color(0xFF8A93AC),
                             fontWeight: FontWeight.w600,

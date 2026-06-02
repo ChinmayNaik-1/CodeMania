@@ -1,4 +1,3 @@
-import 'package:codemania/models/problem_model.dart';
 import 'package:codemania/screens/admin/admin_dashboard.dart';
 import 'package:codemania/features/admin/screens/admin_contests_screen.dart';
 import 'package:codemania/features/admin/screens/create_contest_screen.dart';
@@ -8,7 +7,7 @@ import 'package:codemania/screens/auth/google_signup_completion_screen.dart';
 import 'package:codemania/screens/auth/login_screen.dart';
 import 'package:codemania/screens/auth/register_screen.dart';
 import 'package:codemania/features/contests/screens/contest_detail_screen.dart';
-import 'package:codemania/features/contests/screens/contests_screen.dart';
+import 'package:codemania/features/contests/screens/contest_problem_screen.dart';
 import 'package:codemania/screens/problem_page/problem_page.dart';
 import 'package:codemania/screens/public/landing_screen.dart';
 import 'package:codemania/screens/user/home_screen.dart';
@@ -118,7 +117,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/contests',
         name: 'contestList',
-        builder: (context, state) => const ContestsScreen(),
+        builder: (context, state) => const HomeScreen(initialTab: 2),
       ),
       GoRoute(
         path: '/contests/:contestId',
@@ -134,7 +133,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final contestId = int.tryParse(state.pathParameters['contestId'] ?? '0') ?? 0;
           final problemId = int.tryParse(state.pathParameters['problemId'] ?? '0') ?? 0;
-          return ProblemPage(problemId: problemId, contestId: contestId);
+          return ContestProblemScreen(contestId: contestId, problemId: problemId);
         },
       ),
     ],

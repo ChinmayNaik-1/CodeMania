@@ -32,7 +32,9 @@ BoxDecoration get _cardDeco => BoxDecoration(
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ContestsScreen extends ConsumerStatefulWidget {
-  const ContestsScreen({super.key});
+  const ContestsScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<ContestsScreen> createState() => _ContestsScreenState();
@@ -60,16 +62,13 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
     final username = authState.user?.username ?? '';
     final contestsAsync = ref.watch(contestListProvider);
 
-    return Scaffold(
-      backgroundColor: _kBg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Top bar ──────────────────────────────────────────────────────
-            _TopBar(username: username),
-            const SizedBox(height: 16),
-            // ── Title ────────────────────────────────────────────────────────
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Top bar ──────────────────────────────────────────────────────
+        if (!widget.embedded) _TopBar(username: username),
+        if (!widget.embedded) const SizedBox(height: 16),
+        // ── Title ────────────────────────────────────────────────────────
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
@@ -148,8 +147,15 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
               ),
             ),
           ],
-        ),
-      ),
+        );
+
+    if (widget.embedded) {
+      return content;
+    }
+
+    return Scaffold(
+      backgroundColor: _kBg,
+      body: SafeArea(child: content),
     );
   }
 }

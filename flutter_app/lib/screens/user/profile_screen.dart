@@ -6,7 +6,7 @@ import 'package:codemania/features/profile/providers/profile_provider.dart';
 import 'package:codemania/features/friends/providers/friends_provider.dart';
 import 'package:codemania/features/profile/widgets/edit_profile_sheet.dart';
 import 'package:codemania/core/models/profile_model.dart';
-import 'package:codemania/services/api_service.dart';
+
 import 'package:codemania/widgets/submission_heatmap.dart';
 
 // ─── Design tokens (app light theme) ─────────────────────────────────────────
@@ -22,22 +22,7 @@ const _kHard    = Color(0xFFFF375F);
 const _kGreen   = Color(0xFF22C55E);
 const _kDanger  = Color(0xFFEF4444);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Heatmap data provider (fetches all submissions — any verdict)
-// ─────────────────────────────────────────────────────────────────────────────
 
-final _heatmapProvider =
-    FutureProvider.family<List<HeatmapDay>, int>((ref, userId) async {
-  try {
-    final res = await ApiService.get(
-        '/api/submissions/heatmap', params: {'userId': userId});
-    if (res.statusCode == 200) {
-      final list = res.data['heatmap'] as List? ?? [];
-      return list.map((e) => HeatmapDay.fromJson(e as Map<String, dynamic>)).toList();
-    }
-  } catch (_) {}
-  return [];
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen — no sidebar (full-page view; navigate back via AppBar back button)
@@ -442,7 +427,6 @@ class _RightPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final heatAsync = ref.watch(_heatmapProvider(userId));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -473,18 +457,7 @@ class _RightPanel extends ConsumerWidget {
         // ── Heatmap ───────────────────────────────────────────────────────
         _Section(
           title: 'Submission Activity',
-          child: heatAsync.when(
-            loading: () => const SizedBox(
-                height: 100,
-                child: Center(child: CircularProgressIndicator(color: _kAccent))),
-            error: (_, __) => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                  child: Text('Could not load activity',
-                      style: TextStyle(color: _kTextSec))),
-            ),
-            data: (days) => SubmissionHeatmap(days: days),
-          ),
+          child: SubmissionHeatmap(userId: userId.toString()),
         ),
 
         const SizedBox(height: 16),

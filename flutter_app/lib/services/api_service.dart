@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 
 class ApiService {
@@ -19,8 +20,15 @@ class ApiService {
 
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
-          final token = Config.currentToken;
+        onRequest: (options, handler) async {
+          var token = Config.currentToken;
+          if (token.isEmpty) {
+            final prefs = await SharedPreferences.getInstance();
+            token = prefs.getString('jwt_token') ?? '';
+            if (token.isNotEmpty) {
+              Config.setToken(token);
+            }
+          }
           if (token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
