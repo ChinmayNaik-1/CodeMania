@@ -1,14 +1,29 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'dart:js' as js;
 import 'package:js/js.dart';
 
 // JavaScript interop definitions for Google Identity Services
 @JS('window.triggerGoogleSignIn')
 external void _jsExternalTriggerGoogleSignIn();
 
-@JS('window.dartGoogleAuthService')
-external set dartGoogleAuthService(DartGoogleAuthCallbacks value);
+bool _registerWebJsBridge() {
+  if (!kIsWeb) return false;
+
+  try {
+    js.context['dartCompleteGoogleSignIn'] = allowInterop((String credential) {
+      GoogleAuthService.completeWebSignIn(credential);
+    });
+    if (kDebugMode) print('🔐 [SETUP] Dart completeWebSignIn exposed to JavaScript');
+    return true;
+  } catch (e) {
+    if (kDebugMode) print('🔐 [SETUP-ERROR] $e');
+    return false;
+  }
+}
+
+final bool _webJsBridgeInitialized = _registerWebJsBridge();
 
 class GoogleAuthService {
   static final GoogleAuthService _instance = GoogleAuthService._internal();
@@ -31,15 +46,7 @@ class GoogleAuthService {
 
   static void _setupWebCallbacks() {
     if (!kIsWeb) return;
-    
-    try {
-      // Expose the Dart callback handler to JavaScript
-      // JavaScript will call: window.dartGoogleAuthService.completeWebSignIn(token)
-      dartGoogleAuthService = DartGoogleAuthCallbacks._instance;
-      if (kDebugMode) print('🔐 [SETUP] Dart callbacks exposed to JavaScript');
-    } catch (e) {
-      if (kDebugMode) print('🔐 [SETUP-ERROR] $e');
-    }
+    _registerWebJsBridge();
   }
 
   Future<String?> signInWithGoogle() async {
@@ -157,24 +164,6 @@ class GoogleAuthService {
   Future<bool> isSignedIn() async {
     if (kIsWeb) return false;
     return _googleSignIn.isSignedIn();
-  }
-}
-
-/// Helper class to expose Dart callbacks to JavaScript
-/// JavaScript will call: window.dartGoogleAuthService.completeWebSignIn(token)
-class DartGoogleAuthCallbacks {
-  static final DartGoogleAuthCallbacks _instance = DartGoogleAuthCallbacks._internal();
-  
-  factory DartGoogleAuthCallbacks() => _instance;
-  
-  DartGoogleAuthCallbacks._internal();
-
-  void completeWebSignIn(String idToken) {
-    GoogleAuthService.completeWebSignIn(idToken);
-  }
-
-  void cancelWebSignIn(String reason) {
-    GoogleAuthService.cancelWebSignIn(reason);
   }
 }
 

@@ -32,17 +32,12 @@
       console.log('🔐 [GIS-CALLBACK] Received credential from Google');
       if (response.credential) {
         const idToken = response.credential;
-        try {
-          // Call the Dart callback
-          if (window.dartGoogleAuthService) {
-            console.log('🔐 [GIS-CALLBACK] Calling Dart completeWebSignIn');
-            window.dartGoogleAuthService.completeWebSignIn(idToken);
-            console.log('🔐 [GIS-CALLBACK] Sent token to Dart');
-          } else {
-            console.warn('🔐 [GIS-CALLBACK] Dart GoogleAuthService not available');
-          }
-        } catch(e) {
-          console.error('🔐 [GIS-CALLBACK-ERROR] Error: ' + e);
+        if (typeof window.dartCompleteGoogleSignIn === 'function') {
+          console.log('🔐 [GIS-CALLBACK] Calling Dart completeWebSignIn');
+          window.dartCompleteGoogleSignIn(idToken);
+          console.log('🔐 [GIS-CALLBACK] Sent token to Dart');
+        } else {
+          console.error('🔐 [GIS-CALLBACK] dartCompleteGoogleSignIn not available');
         }
       }
     };
