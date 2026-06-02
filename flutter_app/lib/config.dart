@@ -1,28 +1,8 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class Config {
-  static String get apiBaseUrl => _resolveBackendOrigin();
-  static String get socketUrl => _resolveBackendOrigin();
-
-  static String _resolveBackendOrigin() {
-    if (!kIsWeb) {
-      return 'http://localhost:3000';
-    }
-
-    final origin = Uri.base.origin;
-    const localFrontendOrigins = {
-      'http://localhost:5000',
-      'http://localhost:5001',
-      'http://127.0.0.1:5000',
-      'http://127.0.0.1:5001',
-    };
-
-    if (localFrontendOrigins.contains(origin)) {
-      return 'http://localhost:3000';
-    }
-
-    return origin;
-  }
+  static const String apiBaseUrl = 'https://codemania-nysu.onrender.com';
+  static const String socketUrl = 'https://codemania-nysu.onrender.com';
 
   // Token storage — set after Firebase login
   static String _currentToken = '';

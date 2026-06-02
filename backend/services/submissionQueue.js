@@ -15,11 +15,14 @@ const queueName = 'submission-queue';
 
 function getQueueRedisConfig() {
   const parsed = new URL(redisUrl);
+  const useTls = parsed.protocol === 'rediss:';
   return {
     host: parsed.hostname,
     port: parseInt(parsed.port || '6379', 10),
+    username: parsed.username || undefined,
     password: parsed.password || undefined,
     db: parsed.pathname && parsed.pathname !== '/' ? parseInt(parsed.pathname.slice(1), 10) : 0,
+    tls: useTls ? {} : undefined,
   };
 }
 

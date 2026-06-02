@@ -62,7 +62,8 @@ const corsOptions = {
       'http://127.0.0.1:5001',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:8080',
-    ];
+      process.env.FRONTEND_URL,
+    ].filter(Boolean);
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -89,7 +90,8 @@ const io = new Server(httpServer, {
       'http://localhost:3000',
       'http://localhost:8080',
       'http://127.0.0.1:5000',
-    ],
+      process.env.FRONTEND_URL,
+    ].filter(Boolean),
     methods: ['GET', 'POST'],
     credentials: true,
     allowedHeaders: ['Authorization', 'Content-Type']
@@ -127,6 +129,7 @@ const PORT = process.env.PORT || 3000;
 
 export const dbPool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

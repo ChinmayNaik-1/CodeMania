@@ -288,7 +288,7 @@ codemania/
 
 ## Environment Variables
 
-**backend/.env** (already configured):
+**backend/.env** (local dev example):
 ```
 PORT=3000
 NODE_ENV=development
@@ -297,6 +297,19 @@ DATABASE_URL=postgresql://codemania:codemania@localhost:5432/codemania
 REDIS_URL=redis://localhost:6379
 PISTON_URL=http://localhost:2000/api/v2/execute
 ```
+
+**Render environment variables** (set in Render dashboard):
+```
+NODE_ENV=production
+JWT_SECRET=<strong-random-secret>
+DATABASE_URL=<your-neon-postgres-connection-string>
+REDIS_URL=<your-upstash-redis-connection-string>
+PISTON_URL=<your-piston-base-url>/api/v2/execute
+```
+
+Notes:
+- `PISTON_URL` must include `/api/v2/execute`.
+- Use `rediss://` for Upstash.
 
 ---
 
