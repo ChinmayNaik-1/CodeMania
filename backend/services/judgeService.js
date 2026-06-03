@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 import { processContestSubmission } from './icpcService.js';
 
 let PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
@@ -73,7 +74,14 @@ export async function fetchPistonRuntimes({ forceRefresh = false } = {}) {
   }
 
   try {
-    const response = await axios.get(getPistonRuntimesUrl(), { timeout: 5000 });
+    const response = await axios.get(getPistonRuntimesUrl(), { 
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    });
     const runtimes = Array.isArray(response.data) ? response.data : [];
     runtimeCache = {
       fetchedAt: now,
@@ -364,10 +372,19 @@ export async function runAgainstTestCase(code, language, version, stdin) {
       };
     };
 
+    const axiosOptions = {
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    };
+
     let response;
 
     try {
-      response = await axios.post(PISTON_URL, requestBody(primaryRuntime));
+      response = await axios.post(PISTON_URL, requestBody(primaryRuntime), axiosOptions);
     } catch (error) {
       const shouldRetry =
         error?.response?.status === 400 &&
@@ -381,7 +398,7 @@ export async function runAgainstTestCase(code, language, version, stdin) {
 
         if (fallbackRuntime.version && isDifferent) {
           try {
-            response = await axios.post(PISTON_URL, requestBody(fallbackRuntime));
+            response = await axios.post(PISTON_URL, requestBody(fallbackRuntime), axiosOptions);
           } catch (fallbackError) {
             console.error('=== PISTON ERROR (Fallback) ===');
             console.error('URL called:', PISTON_URL);

@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import https from 'https';
 import pg from 'pg';
 import cors from 'cors';
 import { initRedis } from './services/leaderboardService.js';
@@ -219,7 +220,14 @@ async function checkPistonHealth() {
   const pistonRuntimesUrl = pistonExecuteUrl.replace(/\/execute\/?$/, '/runtimes');
 
   try {
-    const response = await axios.get(pistonRuntimesUrl, { timeout: 5000 });
+    const response = await axios.get(pistonRuntimesUrl, { 
+      timeout: 5000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    });
     const runtimes = Array.isArray(response.data) ? response.data : [];
     console.log(`✓ Piston runtimes available: ${runtimes.length}`);
   } catch (error) {

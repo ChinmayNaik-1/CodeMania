@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 import { dbPool } from '../index.js';
 import { getLeaderboard } from './contestService.js';
 
@@ -68,7 +69,14 @@ async function runOnPiston(language, fullCode, stdin) {
   };
 
   try {
-    const response = await axios.post(PISTON_URL, payload, { timeout: 15000 });
+    const response = await axios.post(PISTON_URL, payload, { 
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+      },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    });
     return response.data;
   } catch (err) {
     console.error('=== PISTON ERROR ===');
