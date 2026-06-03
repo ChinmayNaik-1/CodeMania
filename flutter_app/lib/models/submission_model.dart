@@ -53,23 +53,20 @@ class SubmissionModel {
     };
   }
 
-  bool get isAccepted => verdict == 'accepted';
+  bool get isAccepted {
+    final v = verdict.toLowerCase();
+    return v == 'accepted' || v == 'accept';
+  }
 
   String get statusText {
-    switch (verdict) {
-      case 'accepted':
-        return 'Accepted';
-      case 'wrong_answer':
-        return 'Wrong Answer';
-      case 'runtime_error':
-        return 'Runtime Error';
-      case 'time_limit_exceeded':
-        return 'Time Limit Exceeded';
-      case 'compilation_error':
-        return 'Compilation Error';
-      default:
-        return 'Pending';
-    }
+    final v = verdict.toLowerCase().replaceAll(' ', '_');
+    if (v == 'accepted' || v == 'accept') return 'Accepted';
+    if (v == 'wrong_answer') return 'Wrong Answer';
+    if (v == 'runtime_error') return 'Runtime Error';
+    if (v == 'time_limit_exceeded' || v == 'tle') return 'Time Limit Exceeded';
+    if (v == 'compilation_error' || v == 'compile_error') return 'Compilation Error';
+    
+    return verdict.isNotEmpty ? verdict[0].toUpperCase() + verdict.substring(1) : 'Pending';
   }
 }
 

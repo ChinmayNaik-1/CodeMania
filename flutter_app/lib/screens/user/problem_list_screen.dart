@@ -20,7 +20,7 @@ class ProblemListScreen extends ConsumerStatefulWidget {
 }
 
 class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
-  String _selectedTab = 'Problems';
+  String _selectedTab = 'All';
   String _search = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -49,10 +49,19 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
     List<ProblemModel> filteredProblems = state.problems;
     if (_selectedTab == 'Easy') {
       filteredProblems = state.problems.where((p) => p.difficulty.toLowerCase() == 'easy').toList();
-    } else if (_selectedTab == 'Medium') {
+    } else if (_selectedTab == 'Mid') {
       filteredProblems = state.problems.where((p) => p.difficulty.toLowerCase() == 'medium').toList();
     } else if (_selectedTab == 'Hard') {
       filteredProblems = state.problems.where((p) => p.difficulty.toLowerCase() == 'hard').toList();
+    }
+
+    if (_search.isNotEmpty) {
+      final query = _search.toLowerCase();
+      filteredProblems = filteredProblems.where((p) {
+        return p.title.toLowerCase().contains(query) ||
+               p.topics.any((t) => t.toLowerCase().contains(query)) ||
+               (p.problemNumber?.toString() ?? '').contains(query);
+      }).toList();
     }
 
     final content = Column(
@@ -90,15 +99,20 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
         // Tabs
         Container(
           height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              _buildTab('Problems'),
-              const SizedBox(width: 12),
-              _buildTab('Public List'),
-              const SizedBox(width: 12),
-              _buildTab('Companies'),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _buildDifficultyTab('All'),
+                const SizedBox(width: 8),
+                _buildDifficultyTab('Easy'),
+                const SizedBox(width: 8),
+                _buildDifficultyTab('Mid'),
+                const SizedBox(width: 8),
+                _buildDifficultyTab('Hard'),
+              ],
+            ),
           ),
         ),
 
@@ -145,28 +159,10 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
     );
   }
 
-  Widget _buildTab(String label) {
+
+  Widget _buildDifficultyTab(String label) {
     final isActive = _selectedTab == label;
     final colorScheme = Theme.of(context).colorScheme;
-    
-    // Show difficulty filter tabs
-    final showDifficultyTabs = label == 'Problems';
-    
-    if (showDifficultyTabs && label == 'Problems') {
-      return Expanded(
-        child: Row(
-          children: [
-            _buildDifficultyTab('Problems'),
-            const SizedBox(width: 8),
-            _buildDifficultyTab('Easy'),
-            const SizedBox(width: 8),
-            _buildDifficultyTab('Medium'),
-            const SizedBox(width: 8),
-            _buildDifficultyTab('Hard'),
-          ],
-        ),
-      );
-    }
     
     return GestureDetector(
       onTap: () {
@@ -182,46 +178,13 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: isActive
                 ? colorScheme.onSurface
                 : colorScheme.onSurface.withOpacity(0.6),
             fontWeight: FontWeight.w600,
             fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDifficultyTab(String label) {
-    final isActive = _selectedTab == label;
-    final colorScheme = Theme.of(context).colorScheme;
-    
-    return Flexible(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedTab = label;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive ? colorScheme.surfaceVariant : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: isActive
-                  ? colorScheme.onSurface
-                  : colorScheme.onSurface.withOpacity(0.6),
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
           ),
         ),
       ),

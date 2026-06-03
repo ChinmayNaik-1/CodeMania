@@ -214,7 +214,7 @@ class _LibraryPage extends ConsumerWidget {
               Expanded(
                 child: _DifficultyCard(
                   label: 'Easy',
-                  count: problemState.problems.where((p) => p.difficulty == 'Easy').length,
+                  count: problemState.problems.where((p) => p.difficulty.toLowerCase() == 'easy').length,
                   color: AppTheme.getDifficultyColor('easy', isDark),
                 ),
               ),
@@ -222,7 +222,7 @@ class _LibraryPage extends ConsumerWidget {
               Expanded(
                 child: _DifficultyCard(
                   label: 'Medium',
-                  count: problemState.problems.where((p) => p.difficulty == 'Medium').length,
+                  count: problemState.problems.where((p) => p.difficulty.toLowerCase() == 'medium').length,
                   color: AppTheme.getDifficultyColor('medium', isDark),
                 ),
               ),
@@ -230,100 +230,13 @@ class _LibraryPage extends ConsumerWidget {
               Expanded(
                 child: _DifficultyCard(
                   label: 'Hard',
-                  count: problemState.problems.where((p) => p.difficulty == 'Hard').length,
+                  count: problemState.problems.where((p) => p.difficulty.toLowerCase() == 'hard').length,
                   color: AppTheme.getDifficultyColor('hard', isDark),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          // Recent Submissions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Recent Submissions', style: textTheme.headlineSmall),
-              Icon(Icons.arrow_forward, color: colorScheme.onSurface.withOpacity(0.6)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          submissionsAsync.when(
-            data: (submissions) {
-              final recent = submissions.take(3).toList();
-              if (recent.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'No submissions yet',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                children: recent.map((sub) {
-                  final isAccepted = sub.verdict?.toLowerCase().contains('accept') ?? false;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            sub.problemTitle ?? 'Problem',
-                            style: textTheme.titleMedium,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.getVerdictColor(sub.verdict ?? '', isDark),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            sub.verdict ?? 'Unknown',
-                            style: textTheme.labelSmall?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatTime(sub.submittedAt),
-                          style: textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-            loading: () => CircularProgressIndicator(color: colorScheme.primary),
-            error: (e, s) => Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'No submissions yet',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-            ),
-          ),
+
           const SizedBox(height: 24),
           // Contests
           Row(
