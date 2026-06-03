@@ -62,7 +62,7 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
           padding: const EdgeInsets.all(16),
           child: Container(
             decoration: BoxDecoration(
-              color: Color(0xFF2A2A3E),
+              color: colorScheme.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
             ),
             child: TextField(
@@ -177,7 +177,7 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? Color(0xFF3A3A52) : Colors.transparent,
+          color: isActive ? colorScheme.surfaceVariant : Colors.transparent,
           borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
@@ -208,7 +208,7 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: isActive ? Color(0xFF3A3A52) : Colors.transparent,
+            color: isActive ? colorScheme.surfaceVariant : Colors.transparent,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Text(
@@ -341,7 +341,7 @@ class _ProblemListItem extends StatelessWidget {
           ),
         ),
         Divider(
-          color: Color(0xFF2A2A3E),
+          color: colorScheme.outline,
           height: 1,
           thickness: 0.5,
         ),

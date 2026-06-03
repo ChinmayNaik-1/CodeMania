@@ -6,21 +6,17 @@ import 'package:codemania/features/profile/providers/profile_provider.dart';
 import 'package:codemania/features/friends/providers/friends_provider.dart';
 import 'package:codemania/features/profile/widgets/edit_profile_sheet.dart';
 import 'package:codemania/core/models/profile_model.dart';
+import 'package:codemania/core/theme/app_theme.dart';
 
 import 'package:codemania/widgets/submission_heatmap.dart';
 
-// ─── Design tokens (app light theme) ─────────────────────────────────────────
-const _kBg      = Color(0xFFF0F0F8);
-const _kCard    = Color(0xFFFFFFFF);
-const _kBorder  = Color(0xFFE5E5F0);
-const _kAccent  = Color(0xFF6C3CE1);
-const _kTextPri = Color(0xFF1A1A2E);
-const _kTextSec = Color(0xFF666680);
+// Brand colors that stay the same across themes
 const _kEasy    = Color(0xFF00B8A3);
 const _kMedium  = Color(0xFFFFA116);
 const _kHard    = Color(0xFFFF375F);
 const _kGreen   = Color(0xFF22C55E);
 const _kDanger  = Color(0xFFEF4444);
+const _kAccent  = Color(0xFF6C3CE1);
 
 
 
@@ -80,43 +76,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     final profileAsync = ref.watch(profileProvider(widget.userId));
     final authState = ref.watch(authProvider);
     final isOwn = authState.user?.id == widget.userId;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: _kCard,
+        backgroundColor: colorScheme.surface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         automaticallyImplyLeading: false,
-        title: const Text(
+        title: Text(
           'Profile',
-          style: TextStyle(color: _kTextPri, fontWeight: FontWeight.w800, fontSize: 18),
+          style: TextStyle(color: colorScheme.onBackground, fontWeight: FontWeight.w800, fontSize: 18),
         ),
         actions: [
           if (isOwn)
             IconButton(
-              icon: const Icon(Icons.settings, size: 22, color: _kTextSec),
+              icon: Icon(Icons.settings, size: 22, color: colorScheme.onSurface.withOpacity(0.6)),
               onPressed: () => context.push('/settings'),
             ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: _kBorder),
+          child: Container(height: 1, color: colorScheme.outline),
         ),
       ),
       body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: _kAccent)),
+        loading: () => Center(child: CircularProgressIndicator(color: colorScheme.primary)),
         error: (err, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, color: _kDanger, size: 48),
+              Icon(Icons.error_outline, color: _kDanger, size: 48),
               const SizedBox(height: 12),
-              const Text('Failed to load profile',
-                  style: TextStyle(color: _kTextPri, fontWeight: FontWeight.w600, fontSize: 16)),
+              Text('Failed to load profile',
+                  style: TextStyle(color: colorScheme.onBackground, fontWeight: FontWeight.w600, fontSize: 16)),
               const SizedBox(height: 8),
               Text(err.toString(),
-                  style: const TextStyle(color: _kTextSec, fontSize: 12)),
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () => ref.invalidate(profileProvider(widget.userId)),
@@ -191,6 +188,8 @@ class _LeftPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return _Section(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -198,14 +197,14 @@ class _LeftPanel extends ConsumerWidget {
           // Avatar
           CircleAvatar(
             radius: 44,
-            backgroundColor: _kAccent.withOpacity(0.15),
+            backgroundColor: colorScheme.primary.withOpacity(0.15),
             backgroundImage:
                 profile.avatarUrl != null ? NetworkImage(profile.avatarUrl!) : null,
             child: profile.avatarUrl == null
                 ? Text(
                     profile.username.isNotEmpty ? profile.username[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                        fontSize: 30, fontWeight: FontWeight.w900, color: _kAccent),
+                    style: TextStyle(
+                        fontSize: 30, fontWeight: FontWeight.w900, color: colorScheme.primary),
                   )
                 : null,
           ),
@@ -214,8 +213,8 @@ class _LeftPanel extends ConsumerWidget {
           // Username
           Text(
             profile.username,
-            style: const TextStyle(
-                color: _kTextPri, fontWeight: FontWeight.w800, fontSize: 22),
+            style: TextStyle(
+                color: colorScheme.onBackground, fontWeight: FontWeight.w800, fontSize: 22),
           ),
 
           // Join date
@@ -223,7 +222,7 @@ class _LeftPanel extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               'Joined ${_fmtDate(profile.createdAt!)}',
-              style: const TextStyle(color: _kTextSec, fontSize: 12),
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12),
             ),
           ],
 
@@ -233,14 +232,14 @@ class _LeftPanel extends ConsumerWidget {
             Text(
               profile.bio!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: _kTextSec, fontSize: 13),
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13),
             ),
           ],
 
           const SizedBox(height: 16),
 
           // Stats row: Solved | Contests | Friends
-          _inlineStats(profile),
+          _inlineStats(profile, context),
 
           const SizedBox(height: 16),
 
@@ -258,11 +257,11 @@ class _LeftPanel extends ConsumerWidget {
           // Languages
           if (profile.languages.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
               child: Text('Languages',
                   style: TextStyle(
-                      color: _kTextPri, fontWeight: FontWeight.w700, fontSize: 15)),
+                      color: colorScheme.onBackground, fontWeight: FontWeight.w700, fontSize: 15)),
             ),
             const SizedBox(height: 10),
             ...profile.languages.map(
@@ -272,10 +271,10 @@ class _LeftPanel extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(l.language,
-                        style: const TextStyle(color: _kTextSec, fontSize: 13)),
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13)),
                     Text('${l.problemsSolved} solved',
-                        style: const TextStyle(
-                            color: _kAccent, fontWeight: FontWeight.w600, fontSize: 13)),
+                        style: TextStyle(
+                            color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 13)),
                   ],
                 ),
               ),
@@ -286,40 +285,46 @@ class _LeftPanel extends ConsumerWidget {
     );
   }
 
-  Widget _inlineStats(UserProfileModel p) {
+  Widget _inlineStats(UserProfileModel p, BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: _kBg,
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Row(
         children: [
-          _statCell('${p.totalSolved}', 'Solved'),
-          _divider(),
-          _statCell('${p.contestHistory.length}', 'Contests'),
-          _divider(),
-          _statCell('0', 'Friends'),
+          _statCell('${p.totalSolved}', 'Solved', context),
+          _divider(context),
+          _statCell('${p.contestHistory.length}', 'Contests', context),
+          _divider(context),
+          _statCell('0', 'Friends', context),
         ],
       ),
     );
   }
 
-  Widget _statCell(String value, String label) => Expanded(
+  Widget _statCell(String value, String label, BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return Expanded(
         child: Column(
           children: [
             Text(value,
-                style: const TextStyle(
-                    color: _kTextPri, fontWeight: FontWeight.w800, fontSize: 20)),
+                style: TextStyle(
+                    color: colorScheme.onBackground, fontWeight: FontWeight.w800, fontSize: 20)),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(color: _kTextSec, fontSize: 11)),
+            Text(label, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 11)),
           ],
         ),
       );
+  }
 
-  Widget _divider() =>
-      Container(width: 1, height: 30, color: _kBorder);
+  Widget _divider(BuildContext context) =>
+      Container(width: 1, height: 30, color: Theme.of(context).colorScheme.outline);
 
   String _fmtDate(DateTime dt) {
     const m = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -369,8 +374,8 @@ class _FriendActionButtonState extends ConsumerState<_FriendActionButton> {
       return OutlinedButton(
         onPressed: null,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: _kBorder),
-          foregroundColor: _kTextSec,
+          side: BorderSide(color: Theme.of(context).dividerColor),
+          foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Text('Request Pending'),
@@ -471,6 +476,7 @@ class _SolvedPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = profile.totalProblems > 0 ? profile.totalProblems : 1;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Row(
       children: [
@@ -482,7 +488,7 @@ class _SolvedPanel extends StatelessWidget {
               CircularProgressIndicator(
                 value: (profile.totalSolved / total).clamp(0.0, 1.0),
                 strokeWidth: 10,
-                backgroundColor: _kBg,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
                 valueColor: const AlwaysStoppedAnimation<Color>(_kMedium),
               ),
               Center(
@@ -490,10 +496,10 @@ class _SolvedPanel extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text('${profile.totalSolved}',
-                        style: const TextStyle(
-                            color: _kTextPri, fontSize: 26, fontWeight: FontWeight.w900)),
-                    const Text('Solved',
-                        style: TextStyle(color: _kTextSec, fontSize: 10)),
+                        style: TextStyle(
+                            color: colorScheme.onBackground, fontSize: 26, fontWeight: FontWeight.w900)),
+                    Text('Solved',
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 10)),
                   ],
                 ),
               ),
@@ -527,12 +533,14 @@ class _DiffBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ratio = total > 0 ? (solved / total).clamp(0.0, 1.0) : 0.0;
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
-          Text('$solved', style: const TextStyle(color: _kTextPri, fontWeight: FontWeight.bold, fontSize: 13)),
+          Text('$solved', style: TextStyle(color: colorScheme.onBackground, fontWeight: FontWeight.bold, fontSize: 13)),
         ]),
         const SizedBox(height: 4),
         ClipRRect(
@@ -540,7 +548,7 @@ class _DiffBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: ratio,
             minHeight: 6,
-            backgroundColor: _kBg,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
@@ -557,12 +565,14 @@ class _RecentAC extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     if (profile.recentAC.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Center(
           child: Text('No accepted submissions yet.',
-              style: TextStyle(color: _kTextSec)),
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6))),
         ),
       );
     }
@@ -579,12 +589,12 @@ class _RecentAC extends StatelessWidget {
                   onTap: () => context.push('/problems/${ac.problemId}'),
                   child: Text(
                     ac.title,
-                    style: const TextStyle(
-                      color: _kAccent,
+                    style: TextStyle(
+                      color: colorScheme.primary,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       decoration: TextDecoration.underline,
-                      decorationColor: _kAccent,
+                      decorationColor: colorScheme.primary,
                     ),
                   ),
                 ),
@@ -592,7 +602,7 @@ class _RecentAC extends StatelessWidget {
               const SizedBox(width: 10),
               _VerdictChip(verdict: 'Accepted'),
               const SizedBox(width: 10),
-              Text(ago, style: const TextStyle(color: _kTextSec, fontSize: 12)),
+              Text(ago, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
             ],
           ),
         );
@@ -644,21 +654,23 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _kCard,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: colorScheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title != null) ...[
             Text(title!,
-                style: const TextStyle(
-                    color: _kTextPri, fontWeight: FontWeight.w800, fontSize: 16)),
+                style: TextStyle(
+                    color: colorScheme.onBackground, fontWeight: FontWeight.w800, fontSize: 16)),
             const SizedBox(height: 16),
           ],
           child,
@@ -676,13 +688,15 @@ class _BigStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _kCard,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kBorder),
+          border: Border.all(color: colorScheme.outline),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -692,8 +706,8 @@ class _BigStat extends StatelessWidget {
                     color: accent, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
             const SizedBox(height: 6),
             Text(value,
-                style: const TextStyle(
-                    color: _kTextPri, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -1)),
+                style: TextStyle(
+                    color: colorScheme.onBackground, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -1)),
           ],
         ),
       ),

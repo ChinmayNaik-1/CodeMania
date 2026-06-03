@@ -54,25 +54,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      extendBody: true,
       body: SafeArea(
         child: pages[_selectedIndex],
       ),
-      bottomNavigationBar: Container(
-        height: 64,
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          border: Border(
-            top: BorderSide(color: colorScheme.outline, width: 1),
-          ),
+      bottomNavigationBar: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(0, Icons.menu_book_outlined, 'Library'),
-            _buildNavItem(1, Icons.emoji_events_outlined, 'Contests'),
-            _buildNavItem(2, Icons.search, 'Search'),
-            _buildNavItem(3, Icons.person_outline, 'You'),
-          ],
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            border: Border(
+              top: BorderSide(color: colorScheme.outline, width: 1),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.menu_book_outlined, 'Library'),
+              _buildNavItem(1, Icons.emoji_events_outlined, 'Contests'),
+              _buildNavItem(2, Icons.search, 'Search'),
+              _buildNavItem(3, Icons.person_outline, 'You'),
+            ],
+          ),
         ),
       ),
     );
