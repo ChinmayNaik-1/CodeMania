@@ -143,7 +143,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _openProblem(ProblemModel problem) {
     ref.read(problemListProvider.notifier).fetchProblemById(problem.id);
-    context.go('/problems/${problem.id}');
+    context.push('/problems/${problem.id}');
   }
 }
 

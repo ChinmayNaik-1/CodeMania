@@ -9,6 +9,9 @@ import 'package:codemania/screens/auth/register_screen.dart';
 import 'package:codemania/features/contests/screens/contest_detail_screen.dart';
 import 'package:codemania/features/contests/screens/contest_problem_screen.dart';
 import 'package:codemania/screens/problem_page/problem_page.dart';
+import 'package:codemania/screens/problem_detail_screen.dart';
+import 'package:codemania/screens/code_editor_screen.dart';
+import 'package:codemania/screens/submission_detail_screen.dart';
 import 'package:codemania/screens/user/home_screen.dart';
 import 'package:codemania/screens/user/profile_screen.dart';
 import 'package:codemania/features/friends/screens/friends_screen.dart';
@@ -110,7 +113,24 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'problemDetail',
         builder: (context, state) {
           final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
-          return ProblemPage(problemId: id);
+          return ProblemDetailScreen(problemId: id);
+        },
+      ),
+      GoRoute(
+        path: '/problems/:id/editor',
+        name: 'codeEditor',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          return CodeEditorScreen(problemId: id);
+        },
+      ),
+      GoRoute(
+        path: '/problems/:id/submissions/:submissionId',
+        name: 'submissionDetail',
+        builder: (context, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
+          final submissionId = int.tryParse(state.pathParameters['submissionId'] ?? '0') ?? 0;
+          return SubmissionDetailScreen(problemId: id, submissionId: submissionId);
         },
       ),
       GoRoute(
@@ -132,7 +152,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final contestId = int.tryParse(state.pathParameters['contestId'] ?? '0') ?? 0;
           final problemId = int.tryParse(state.pathParameters['problemId'] ?? '0') ?? 0;
-          return ContestProblemScreen(contestId: contestId, problemId: problemId);
+          return ProblemDetailScreen(problemId: problemId, contestId: contestId);
+        },
+      ),
+      GoRoute(
+        path: '/contests/:contestId/problems/:problemId/editor',
+        name: 'contestCodeEditor',
+        builder: (context, state) {
+          final contestId = int.tryParse(state.pathParameters['contestId'] ?? '0') ?? 0;
+          final problemId = int.tryParse(state.pathParameters['problemId'] ?? '0') ?? 0;
+          return CodeEditorScreen(problemId: problemId, contestId: contestId);
         },
       ),
       GoRoute(
