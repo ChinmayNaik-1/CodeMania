@@ -2,10 +2,10 @@ import axios from 'axios';
 import https from 'https';
 import { processContestSubmission } from './icpcService.js';
 
-let PISTON_URL = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
-if (PISTON_URL.includes('/api/v2/execute/api/v2/execute')) {
-  PISTON_URL = PISTON_URL.replace('/api/v2/execute/api/v2/execute', '/api/v2/execute');
-}
+const basePistonUrl = (process.env.PISTON_URL || 'http://localhost:2000')
+  .replace(/\/$/, '')
+  .replace(/\/api\/v2(\/execute|\/runtimes)?$/, '');
+const PISTON_URL = `${basePistonUrl}/api/v2/execute`;
 const RUNTIME_CACHE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_RUNTIME_FALLBACK = {
   python: '3.10.0',

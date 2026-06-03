@@ -213,11 +213,10 @@ initPresenceSocket(io);
 initSubmissionQueue(io, dbPool);
 
 async function checkPistonHealth() {
-  let pistonExecuteUrl = process.env.PISTON_URL || 'http://localhost:2000/api/v2/execute';
-  if (pistonExecuteUrl.includes('/api/v2/execute/api/v2/execute')) {
-    pistonExecuteUrl = pistonExecuteUrl.replace('/api/v2/execute/api/v2/execute', '/api/v2/execute');
-  }
-  const pistonRuntimesUrl = pistonExecuteUrl.replace(/\/execute\/?$/, '/runtimes');
+  const basePistonUrl = (process.env.PISTON_URL || 'http://localhost:2000')
+    .replace(/\/$/, '')
+    .replace(/\/api\/v2(\/execute|\/runtimes)?$/, '');
+  const pistonRuntimesUrl = `${basePistonUrl}/api/v2/runtimes`;
 
   try {
     const response = await axios.get(pistonRuntimesUrl, { 
