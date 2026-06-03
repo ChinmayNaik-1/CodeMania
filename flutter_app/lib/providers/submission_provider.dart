@@ -157,10 +157,17 @@ class SubmissionNotifier extends StateNotifier<SubmissionState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      String url = '/submit?page=$page';
-      if (userId != null) url += '&userId=$userId';
-      if (problemId != null) url += '&problemId=$problemId';
-      if (contestId != null) url += '&contestId=$contestId';
+      String url;
+      
+      if (problemId != null) {
+        // Use the specific endpoint for problem submissions
+        url = '/api/submissions/problem/$problemId?page=$page';
+      } else {
+        // Fallback to general submit endpoint with query params
+        url = '/submit?page=$page';
+        if (userId != null) url += '&userId=$userId';
+        if (contestId != null) url += '&contestId=$contestId';
+      }
 
       final response = await ApiService.get(url);
       final submissions = (response.data['submissions'] as List)

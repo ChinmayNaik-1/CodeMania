@@ -12,6 +12,7 @@ import 'package:codemania/services/runtime_service.dart';
 import 'package:codemania/services/api_service.dart';
 import 'package:codemania/config.dart';
 import 'package:codemania/core/utils/monaco_error_helper.dart';
+import 'package:codemania/providers/submission_provider.dart';
 
 // Provider for bottom sheet state
 final consoleSheetVisibleProvider = StateProvider.autoDispose<bool>((ref) => false);
@@ -203,12 +204,12 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
         });
 
         // Update overall status - PRIORITY: Compile Error > Runtime Error > Wrong Answer > Accepted
-        // If ANY test case fails, the overall verdict must reflect that failure
-        if (!passed || caseStatus != 'Accepted') {
+        // Only mark as failure if the test case actually FAILED
+        if (!passed) {
           if (caseStatus == 'Compile Error' || errorMessage?.contains('CompileError') == true) {
             status = 'Compile Error';
             firstErrorMessage ??= errorMessage;
-          } else if (caseStatus == 'Runtime Error' || errorMessage?.isNotEmpty == true) {
+          } else if (caseStatus == 'Runtime Error' || (errorMessage != null && errorMessage.isNotEmpty)) {
             // Only set to Runtime Error if status isn't already Compile Error
             if (status != 'Compile Error') {
               status = 'Runtime Error';
@@ -227,6 +228,12 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
             }
           }
         }
+      }
+
+      // Final check: if all cases passed, ensure status is Accepted
+      final allPassed = caseResults.every((result) => result['passed'] == true);
+      if (allPassed && status == 'Accepted') {
+        status = 'Accepted';
       }
 
       MonacoErrorHelper.clearMarkers();
@@ -334,28 +341,11 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
       if (mounted) {
         Navigator.of(context).pop(); // Close judging overlay
         
-        // Show result in bottom sheet
-        final status = _statusFromVerdict(verdict);
-        final runtimeMs = submission['runtime_ms'] ?? submission['time_ms'];
+        // Invalidate submissions to refresh the list
+        ref.invalidate(submissionProvider);
         
-        ref.read(runResultProvider.notifier).state = {
-          'status': status,
-          'runtimeMs': runtimeMs,
-          'errorMessage': submission['error_message'],
-          'isSubmission': true,
-        };
-        
-        ref.read(consoleSheetVisibleProvider.notifier).state = true;
-        ref.read(consoleSheetTabProvider.notifier).state = 1; // Run Result tab
-        
-        // Show snackbar
-        final isAccepted = verdict == 'accepted';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(status),
-            backgroundColor: isAccepted ? const Color(0xFF00B84C) : const Color(0xFFFF375F),
-          ),
-        );
+        // Navigate to submission detail full screen
+        context.push('/submissions/$submissionId');
       }
       return;
     }
@@ -387,11 +377,16 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final problemState = ref.watch(problemProvider(widget.problemId));
     final problem = problemState.problem;
     final consoleVisible = ref.watch(consoleSheetVisibleProvider);
+    
+    // Watch these so they don't get auto-disposed when switching bottom sheet tabs
+    ref.watch(consoleSheetTabProvider);
+    ref.watch(runResultProvider);
 
     if (problem != null) {
       if (_loadedProblemId != problem.id || _loadedLanguage != problemState.selectedLanguage) {

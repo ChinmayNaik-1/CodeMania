@@ -6,26 +6,10 @@ import 'package:codemania/core/models/contest_model.dart';
 import 'package:codemania/features/contests/providers/contest_provider.dart';
 import 'package:codemania/providers/auth_provider.dart';
 
-// ─── Theme constants ──────────────────────────────────────────────────────────
-const _kPrimary = Color(0xFF6C5CE7);
-const _kPrimaryDark = Color(0xFF5A4BD1);
-const _kBg = Color(0xFFF5F3FF);
-const _kSurface = Colors.white;
-const _kTextPri = Color(0xFF1A1A2E);
-const _kTextSec = Color(0xFF6B7280);
+// Brand colors that stay constant
 const _kAccepted = Color(0xFF00B8A3);
 const _kError = Color(0xFFFF375F);
-
-BoxDecoration get _cardDeco => BoxDecoration(
-      color: _kSurface,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4))
-      ],
-    );
+const _kPrimary = Color(0xFF6C3CE1);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ContestsScreen
@@ -58,6 +42,7 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final authState = ref.watch(authProvider);
     final username = authState.user?.username ?? '';
     final contestsAsync = ref.watch(contestListProvider);
@@ -69,14 +54,14 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
         if (!widget.embedded) _TopBar(username: username),
         if (!widget.embedded) const SizedBox(height: 16),
         // ── Title ────────────────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
                 'Contests',
                 style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    color: _kTextPri,
+                    color: colorScheme.onBackground,
                     letterSpacing: -0.5),
               ),
             ),
@@ -87,7 +72,7 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
               child: Container(
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
@@ -99,12 +84,12 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
                 child: TabBar(
                   controller: _tab,
                   indicator: BoxDecoration(
-                    color: _kPrimary,
+                    color: colorScheme.primary,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   indicatorSize: TabBarIndicatorSize.tab,
                   labelColor: Colors.white,
-                  unselectedLabelColor: _kTextSec,
+                  unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
                   labelStyle: const TextStyle(
                       fontWeight: FontWeight.w700, fontSize: 13),
                   dividerColor: Colors.transparent,
@@ -121,16 +106,16 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
             Expanded(
               child: contestsAsync.when(
                 loading: () =>
-                    const Center(child: CircularProgressIndicator(color: _kPrimary)),
+                    Center(child: CircularProgressIndicator(color: colorScheme.primary)),
                 error: (e, _) => Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Failed to load contests', style: const TextStyle(color: _kTextSec)),
+                      Text('Failed to load contests', style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6))),
                       const SizedBox(height: 12),
                       ElevatedButton(
                         onPressed: () => ref.invalidate(contestListProvider),
-                        style: ElevatedButton.styleFrom(backgroundColor: _kPrimary),
+                        style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary),
                         child: const Text('Retry', style: TextStyle(color: Colors.white)),
                       ),
                     ],
@@ -154,7 +139,7 @@ class _ContestsScreenState extends ConsumerState<ContestsScreen>
     }
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(child: content),
     );
   }
@@ -168,23 +153,25 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEDE9FF), width: 1)),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1)),
       ),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => context.go('/home'),
-            child: const Text(
+            child: Text(
               '<Codemania/>',
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
-                  color: _kPrimary,
+                  color: colorScheme.primary,
                   letterSpacing: -0.5),
             ),
           ),
@@ -193,12 +180,12 @@ class _TopBar extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFEDE9FF),
+              color: colorScheme.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(username,
-                style: const TextStyle(
-                    color: _kPrimary,
+                style: TextStyle(
+                    color: colorScheme.primary,
                     fontWeight: FontWeight.w700,
                     fontSize: 13)),
           ),
@@ -217,23 +204,25 @@ class _ContestList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     if (contests.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.emoji_events_outlined,
-                size: 56, color: _kPrimary.withOpacity(0.3)),
+                size: 56, color: colorScheme.primary.withOpacity(0.3)),
             const SizedBox(height: 12),
             Text('No $type contests',
-                style: const TextStyle(color: _kTextSec, fontSize: 16)),
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 16)),
           ],
         ),
       );
     }
 
     return RefreshIndicator(
-      color: _kPrimary,
+      color: colorScheme.primary,
       onRefresh: () async {},
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -253,12 +242,23 @@ class _ContestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return GestureDetector(
       onTap: () => context.push('/contests/${contest.id}'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(18),
-        decoration: _cardDeco,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4))
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -267,10 +267,10 @@ class _ContestCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(contest.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: _kTextPri)),
+                          color: colorScheme.onSurface)),
                 ),
                 _TypeBadge(contestType: contest.contestType),
               ],
@@ -278,16 +278,16 @@ class _ContestCard extends StatelessWidget {
             const SizedBox(height: 8),
             // Time info
             Row(children: [
-              const Icon(Icons.schedule_outlined, size: 14, color: _kTextSec),
+              Icon(Icons.schedule_outlined, size: 14, color: colorScheme.onSurface.withOpacity(0.6)),
               const SizedBox(width: 4),
-              Text(_timeLabel(), style: const TextStyle(color: _kTextSec, fontSize: 13)),
+              Text(_timeLabel(), style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13)),
             ]),
             const SizedBox(height: 4),
             Row(children: [
-              const Icon(Icons.assignment_outlined, size: 14, color: _kTextSec),
+              Icon(Icons.assignment_outlined, size: 14, color: colorScheme.onSurface.withOpacity(0.6)),
               const SizedBox(width: 4),
               Text('${contest.problemCount} problems',
-                  style: const TextStyle(color: _kTextSec, fontSize: 13)),
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13)),
             ]),
             const SizedBox(height: 14),
             // Countdown + action button

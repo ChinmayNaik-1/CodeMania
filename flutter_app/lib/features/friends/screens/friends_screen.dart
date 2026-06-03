@@ -9,15 +9,9 @@ import 'package:codemania/widgets/app_sidebar.dart';
 import 'package:codemania/services/api_service.dart';
 import 'package:flutter/foundation.dart';
 
-// ─── Design tokens (match app light theme exactly) ────────────────────────────
-const _kBg       = Color(0xFFF0F0F8);
-const _kCard     = Color(0xFFFFFFFF);
-const _kBorder   = Color(0xFFE5E5F0);
-const _kAccent   = Color(0xFF6C3CE1);  // primary purple
-const _kTextPri  = Color(0xFF1A1A2E);
-const _kTextSec  = Color(0xFF666680);
-const _kGreen    = Color(0xFF22C55E);
-const _kDanger   = Color(0xFFEF4444);
+// Brand colors that stay constant
+const _kDanger = Color(0xFFEF4444);
+const _kGreen = Color(0xFF22C55E);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Screen
@@ -67,9 +61,10 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 
   void _snack(String msg, {bool isError = false}) {
     if (!mounted) return;
+    final colorScheme = Theme.of(context).colorScheme;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: const TextStyle(color: Colors.white)),
-      backgroundColor: isError ? _kDanger : _kAccent,
+      backgroundColor: isError ? Colors.red : colorScheme.primary,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ));
@@ -78,6 +73,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(friendsProvider);
+    final colorScheme = Theme.of(context).colorScheme;
     final requestCount = state.incomingRequests.length;
     final isCompact = MediaQuery.of(context).size.width < 1080;
 
@@ -106,13 +102,13 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 
         // ── Tab bar ───────────────────────────────────────────────────────
         Container(
-          color: _kCard,
+          color: colorScheme.surface,
           child: TabBar(
             controller: _tabController,
-            indicatorColor: _kAccent,
+            indicatorColor: colorScheme.primary,
             indicatorWeight: 2.5,
-            labelColor: _kAccent,
-            unselectedLabelColor: _kTextSec,
+            labelColor: colorScheme.primary,
+            unselectedLabelColor: colorScheme.onSurface.withOpacity(0.6),
             labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             tabs: [
               const Tab(text: 'My Friends'),
@@ -160,7 +156,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
 
     // Wrap with sidebar on wide screens
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: isCompact
           ? Drawer(
               child: SafeArea(
@@ -209,23 +205,28 @@ class _FriendsTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
       height: 76,
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFDFDFF),
-        border: Border(bottom: BorderSide(color: Color(0xFFE9E4F4))),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Row(
         children: [
           if (onMenuTap != null) ...[
-            IconButton(onPressed: onMenuTap, icon: const Icon(Icons.menu)),
+            IconButton(
+              onPressed: onMenuTap,
+              icon: Icon(Icons.menu, color: colorScheme.onSurface),
+            ),
             const SizedBox(width: 4),
           ],
-          const Text(
+          Text(
             'Friends',
             style: TextStyle(
-              color: Color(0xFF202547),
+              color: colorScheme.onSurface,
               fontSize: 22,
               fontWeight: FontWeight.w800,
             ),
@@ -233,7 +234,7 @@ class _FriendsTopBar extends StatelessWidget {
           const Spacer(),
           IconButton(
             onPressed: () => context.go('/home'),
-            icon: const Icon(Icons.home_outlined, color: Color(0xFF7B7892)),
+            icon: Icon(Icons.home_outlined, color: colorScheme.onSurface.withOpacity(0.7)),
           ),
         ],
       ),
@@ -259,6 +260,7 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final friends = widget.state.friends
         .where((f) => f.username.toLowerCase().contains(_query.toLowerCase()))
         .toList();
@@ -270,7 +272,7 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
           onChanged: (v) => setState(() => _query = v),
         ),
         if (widget.state.isLoading && friends.isEmpty)
-          const Expanded(child: Center(child: CircularProgressIndicator(color: _kAccent)))
+          Expanded(child: Center(child: CircularProgressIndicator(color: colorScheme.primary)))
         else if (friends.isEmpty)
           Expanded(
             child: _EmptyState(
@@ -284,7 +286,7 @@ class _FriendsTabState extends ConsumerState<_FriendsTab> {
         else
           Expanded(
             child: RefreshIndicator(
-              color: _kAccent,
+              color: colorScheme.primary,
               onRefresh: () => ref.read(friendsProvider.notifier).loadFriends(),
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),
@@ -305,7 +307,10 @@ class _FriendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return _card(
+      context: context,
       child: Row(
         children: [
           _Avatar(username: friend.username, avatarUrl: friend.avatarUrl, isOnline: friend.isOnline),
@@ -315,18 +320,18 @@ class _FriendCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(friend.username,
-                    style: const TextStyle(
-                        color: _kTextPri, fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: TextStyle(
+                        color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
                 const SizedBox(height: 3),
                 Row(children: [
                   Icon(Icons.check_circle_outline, size: 13, color: _kGreen),
                   const SizedBox(width: 4),
                   Text('${friend.solvedCount} solved',
-                      style: const TextStyle(color: _kTextSec, fontSize: 12)),
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
                   const SizedBox(width: 12),
                   const Text('🔥', style: TextStyle(fontSize: 12)),
                   Text(' ${friend.currentStreak}d streak',
-                      style: const TextStyle(color: _kTextSec, fontSize: 12)),
+                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
                 ]),
               ],
             ),
@@ -334,7 +339,7 @@ class _FriendCard extends StatelessWidget {
           FilledButton(
             onPressed: () => context.push('/profile/${friend.id}'),
             style: FilledButton.styleFrom(
-              backgroundColor: _kAccent,
+              backgroundColor: colorScheme.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
@@ -357,10 +362,11 @@ class _RequestsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final requests = state.incomingRequests;
 
     if (state.isLoading && requests.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: _kAccent));
+      return Center(child: CircularProgressIndicator(color: colorScheme.primary));
     }
     if (requests.isEmpty) {
       return const _EmptyState(
@@ -371,7 +377,7 @@ class _RequestsTab extends ConsumerWidget {
     }
 
     return RefreshIndicator(
-      color: _kAccent,
+      color: colorScheme.primary,
       onRefresh: () => ref.read(friendsProvider.notifier).fetchIncomingRequests(),
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
@@ -412,7 +418,10 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return _card(
+      context: context,
       child: Row(
         children: [
           _Avatar(username: request.senderUsername, avatarUrl: request.senderAvatarUrl),
@@ -422,11 +431,11 @@ class _RequestCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(request.senderUsername,
-                    style: const TextStyle(
-                        color: _kTextPri, fontWeight: FontWeight.w700, fontSize: 15)),
+                    style: TextStyle(
+                        color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
                 const SizedBox(height: 2),
-                const Text('wants to be your friend',
-                    style: TextStyle(color: _kTextSec, fontSize: 12)),
+                Text('wants to be your friend',
+                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
               ],
             ),
           ),
@@ -513,6 +522,8 @@ class _FindUsersTabState extends ConsumerState<_FindUsersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Column(
       children: [
         _SearchBar(
@@ -538,9 +549,9 @@ class _FindUsersTabState extends ConsumerState<_FindUsersTab> {
           ),
 
         if (_searching)
-          const Padding(
-            padding: EdgeInsets.all(32),
-            child: CircularProgressIndicator(color: _kAccent),
+          Padding(
+            padding: const EdgeInsets.all(32),
+            child: CircularProgressIndicator(color: colorScheme.primary),
           )
         else if (_results.isEmpty && _searchCtrl.text.isNotEmpty && _searchError.isEmpty)
           const _EmptyState(
@@ -567,6 +578,7 @@ class _FindUsersTabState extends ConsumerState<_FindUsersTab> {
                 final reqSent = (u['request_sent'] as bool? ?? false) || _pendingIds.contains(id);
 
                 return _card(
+                  context: context,
                   child: Row(
                     children: [
                       _Avatar(username: u['username'] as String, avatarUrl: u['avatar_url'] as String?),
@@ -576,17 +588,17 @@ class _FindUsersTabState extends ConsumerState<_FindUsersTab> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(u['username'] as String,
-                                style: const TextStyle(color: _kTextPri, fontWeight: FontWeight.w700, fontSize: 15)),
+                                style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
                             if ((u['solved_count'] as int? ?? 0) > 0)
                               Text('${u['solved_count']} solved',
-                                  style: const TextStyle(color: _kTextSec, fontSize: 12)),
+                                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
                           ],
                         ),
                       ),
                       isFriend
                           ? _statusChip('Friends ✓', _kGreen)
                           : reqSent
-                              ? _statusChip('Pending', _kTextSec)
+                              ? _statusChip('Pending', colorScheme.onSurface.withOpacity(0.6))
                               : FilledButton(
                                   onPressed: () async {
                                     setState(() => _pendingIds.add(id));
@@ -599,7 +611,7 @@ class _FindUsersTabState extends ConsumerState<_FindUsersTab> {
                                     }
                                   },
                                   style: FilledButton.styleFrom(
-                                    backgroundColor: _kAccent,
+                                    backgroundColor: colorScheme.primary,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                   ),
@@ -620,13 +632,15 @@ class _FindUsersTabState extends ConsumerState<_FindUsersTab> {
 // Shared small widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
-Widget _card({required Widget child}) {
+Widget _card({required BuildContext context, required Widget child}) {
+  final colorScheme = Theme.of(context).colorScheme;
+  
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     decoration: BoxDecoration(
-      color: _kCard,
+      color: colorScheme.surface,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _kBorder),
+      border: Border.all(color: Theme.of(context).dividerColor),
     ),
     child: child,
   );
@@ -652,18 +666,20 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Stack(
       clipBehavior: Clip.none,
       children: [
         CircleAvatar(
           radius: 22,
-          backgroundColor: _kAccent.withOpacity(0.15),
+          backgroundColor: colorScheme.primary.withOpacity(0.15),
           backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
           child: avatarUrl == null
               ? Text(
                   username.isNotEmpty ? username[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                      color: _kAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                      color: colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 16),
                 )
               : null,
         ),
@@ -677,7 +693,7 @@ class _Avatar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _kGreen,
                 shape: BoxShape.circle,
-                border: Border.all(color: _kCard, width: 2),
+                border: Border.all(color: colorScheme.surface, width: 2),
               ),
             ),
           ),
@@ -694,30 +710,32 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
       child: TextField(
         controller: controller,
         onChanged: onChanged,
-        style: const TextStyle(color: _kTextPri, fontSize: 14),
+        style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: const TextStyle(color: _kTextSec),
-          prefixIcon: const Icon(Icons.search, color: _kTextSec, size: 18),
+          hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.6)),
+          prefixIcon: Icon(Icons.search, color: colorScheme.onSurface.withOpacity(0.6), size: 18),
           filled: true,
-          fillColor: _kBg,
+          fillColor: colorScheme.surfaceVariant,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kBorder),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kBorder),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: _kAccent, width: 2),
+            borderSide: BorderSide(color: colorScheme.primary, width: 2),
           ),
         ),
       ),
@@ -733,21 +751,23 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 52, color: _kTextSec.withOpacity(0.4)),
+            Icon(icon, size: 52, color: colorScheme.onSurface.withOpacity(0.3)),
             const SizedBox(height: 16),
             Text(title,
-                style: const TextStyle(
-                    color: _kTextPri, fontSize: 17, fontWeight: FontWeight.w700)),
+                style: TextStyle(
+                    color: colorScheme.onSurface, fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             Text(subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: _kTextSec, fontSize: 13)),
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 13)),
           ],
         ),
       ),

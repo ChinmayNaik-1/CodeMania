@@ -25,15 +25,15 @@ class SubmissionModel {
 
   factory SubmissionModel.fromJson(Map<String, dynamic> json) {
     return SubmissionModel(
-      id: json['id'] as int,
-      userId: json['user_id'] as String,
-      problemId: json['problem_id'] as int,
-      verdict: json['verdict'] as String,
-      language: json['language'] as String,
-      passedCases: json['passed_cases'] as int,
-      totalCases: json['total_cases'] as int,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      timeMs: json['time_ms'] as int?,
+      id: json['id'] as int? ?? 0,
+      userId: json['user_id'] as String? ?? '',
+      problemId: json['problem_id'] as int? ?? 0,
+      verdict: json['verdict'] as String? ?? json['status'] as String? ?? 'unknown',
+      language: json['language'] as String? ?? '',
+      passedCases: json['passed_cases'] as int? ?? 0,
+      totalCases: json['total_cases'] as int? ?? 0,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'].toString()) : DateTime.now(),
+      timeMs: (json['time_ms'] ?? json['runtime_ms']) as int?,
       memoryKb: json['memory_kb'] as int?,
     );
   }

@@ -354,6 +354,57 @@ class DescriptionTab extends StatelessWidget {
               selectable: false,
             ),
           ],
+
+          // Follow-up
+          if (problem!.followUp?.isNotEmpty == true) ...[
+            const SizedBox(height: 24),
+            Text(
+              'Follow-up',
+              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            MarkdownBody(
+              data: problem!.followUp!,
+              styleSheet: MarkdownStyleSheet(
+                p: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  height: 1.6,
+                  fontSize: 15,
+                ),
+                code: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFE2E8F0)
+                      : const Color(0xFF1A1A2E),
+                  backgroundColor: Colors.transparent,
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF2A2A3E)
+                      : const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                codeblockPadding: const EdgeInsets.all(12),
+                listBullet: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                ),
+                strong: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  fontWeight: FontWeight.bold,
+                ),
+                em: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              builders: {
+                'code': _InlineCodeBuilder(context),
+              },
+              inlineSyntaxes: [_SuperscriptSyntax()],
+              selectable: false,
+            ),
+          ],
         ],
       ),
     );
@@ -450,7 +501,7 @@ class _SubmissionsTabState extends ConsumerState<SubmissionsTab> {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final submission = submissions[index];
-        final verdictColor = _getVerdictColor(submission.verdict ?? 'pending', context);
+        final verdictColor = _getVerdictColor(submission.verdict, context);
         
         return InkWell(
           onTap: () {
@@ -475,7 +526,7 @@ class _SubmissionsTabState extends ConsumerState<SubmissionsTab> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        submission.verdict ?? 'Pending',
+                        submission.statusText,
                         style: TextStyle(
                           color: verdictColor,
                           fontSize: 12,
@@ -503,8 +554,21 @@ class _SubmissionsTabState extends ConsumerState<SubmissionsTab> {
                     ),
                     if (submission.timeMs != null) ...[
                       const SizedBox(width: 16),
+                      Icon(Icons.access_time, size: 14, color: colorScheme.onSurface.withOpacity(0.6)),
+                      const SizedBox(width: 4),
                       Text(
                         '${submission.timeMs} ms',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                    if (submission.memoryKb != null) ...[
+                      const SizedBox(width: 16),
+                      Icon(Icons.memory, size: 14, color: colorScheme.onSurface.withOpacity(0.6)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${(submission.memoryKb! / 1024).toStringAsFixed(2)} MB',
                         style: textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurface.withOpacity(0.6),
                         ),

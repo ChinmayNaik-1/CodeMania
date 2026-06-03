@@ -12,6 +12,7 @@ import 'package:codemania/screens/problem_page/problem_page.dart';
 import 'package:codemania/screens/problem_detail_screen.dart';
 import 'package:codemania/screens/code_editor_screen.dart';
 import 'package:codemania/screens/submission_detail_screen.dart';
+import 'package:codemania/screens/submission_detail_full_screen.dart';
 import 'package:codemania/screens/user/home_screen.dart';
 import 'package:codemania/screens/user/profile_screen.dart';
 import 'package:codemania/features/friends/screens/friends_screen.dart';
@@ -131,6 +132,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
           final submissionId = int.tryParse(state.pathParameters['submissionId'] ?? '0') ?? 0;
           return SubmissionDetailScreen(problemId: id, submissionId: submissionId);
+        },
+      ),
+      GoRoute(
+        path: '/submissions/:submissionId',
+        name: 'submissionDetailFull',
+        builder: (context, state) {
+          final submissionId = int.tryParse(state.pathParameters['submissionId'] ?? '0') ?? 0;
+          return SubmissionDetailFullScreen(submissionId: submissionId);
         },
       ),
       GoRoute(
