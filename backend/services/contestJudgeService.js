@@ -64,8 +64,8 @@ async function runOnPiston(language, fullCode, stdin) {
     version: '*',
     files: [{ name: normLang === 'c++' ? 'main.cpp' : 'main', content: fullCode }],
     stdin: stdin || '',
-    run_timeout: 5000,
-    compile_timeout: 10000,
+    run_timeout: 15000,
+    compile_timeout: 30000,
   };
 
   try {

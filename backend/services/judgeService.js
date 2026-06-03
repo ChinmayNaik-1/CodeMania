@@ -178,10 +178,10 @@ function getRunTimeoutMs(language = '') {
 
   const normalized = language.toLowerCase();
   if (normalized === 'cpp' || normalized === 'c++') {
-    return 5000;
+    return 15000;
   }
 
-  return 3000;
+  return 10000;
 }
 
 function getCompileTimeoutMs(language = '') {
@@ -195,7 +195,7 @@ function getCompileTimeoutMs(language = '') {
     return 30000;
   }
 
-  return 10000;
+  return 20000;
 }
 
 function parsePistonMemoryLimit(value, fallbackBytes) {

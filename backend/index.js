@@ -257,6 +257,23 @@ async function startServer() {
   }
 }
 
+// --- RENDER FREE TIER SELF-PING KEEPALIVE ---
+// Prevent the server container from entering idle/sleep mode
+const KEEPALIVE_INTERVAL = 10 * 60 * 1000; // Every 10 minutes
+
+setInterval(async () => {
+  try {
+    const backendUrl = process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/health` : `http://localhost:${PORT}/health`;
+    
+    // Using native fetch or axios. Axios is available here.
+    await axios.get(backendUrl, { timeout: 10000 });
+    console.log(`📡 Keepalive ping successfully transmitted to ${backendUrl}`);
+  } catch (error) {
+    // Fail silently so it doesn't interrupt main server threads if offline
+    console.log('📡 Keepalive ping skipped or network trace failed.');
+  }
+}, KEEPALIVE_INTERVAL);
+
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
   httpServer.close(async () => {
