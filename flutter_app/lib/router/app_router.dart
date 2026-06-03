@@ -12,6 +12,8 @@ import 'package:codemania/screens/problem_page/problem_page.dart';
 import 'package:codemania/screens/user/home_screen.dart';
 import 'package:codemania/screens/user/profile_screen.dart';
 import 'package:codemania/features/friends/screens/friends_screen.dart';
+import 'package:codemania/screens/settings/settings_screen.dart';
+import 'package:codemania/screens/settings/dummy_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -128,6 +130,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           final contestId = int.tryParse(state.pathParameters['contestId'] ?? '0') ?? 0;
           final problemId = int.tryParse(state.pathParameters['problemId'] ?? '0') ?? 0;
           return ContestProblemScreen(contestId: contestId, problemId: problemId);
+        },
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/dummy',
+        name: 'settingsDummy',
+        builder: (context, state) {
+          final title = state.extra as String? ?? 'Settings';
+          return DummySettingsPage(title: title);
         },
       ),
     ],

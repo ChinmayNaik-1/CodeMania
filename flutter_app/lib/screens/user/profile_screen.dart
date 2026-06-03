@@ -87,20 +87,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         backgroundColor: _kCard,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: _kTextSec),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Profile',
           style: TextStyle(color: _kTextPri, fontWeight: FontWeight.w800, fontSize: 18),
         ),
+        actions: [
+          if (isOwn)
+            IconButton(
+              icon: const Icon(Icons.settings, size: 22, color: _kTextSec),
+              onPressed: () => context.push('/settings'),
+            ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: _kBorder),
@@ -312,7 +310,7 @@ class _LeftPanel extends ConsumerWidget {
           _divider(),
           _statCell('${p.contestHistory.length}', 'Contests'),
           _divider(),
-          _statCell('${p.friendsCount}', 'Friends'),
+          _statCell('0', 'Friends'),
         ],
       ),
     );
