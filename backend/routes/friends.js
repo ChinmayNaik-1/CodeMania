@@ -90,4 +90,158 @@ router.post('/respond', async (req, res) => {
   }
 });
 
+// ─── GET /api/friends (list all friends) ─────────────────────────────────────
+router.get('/', async (req, res) => {
+  try {
+    const result = await dbPool.query(
+      `SELECT 
+        CASE 
+          WHEN f.requester_id = $1 THEN u2.id
+          ELSE u1.id
+        END AS id,
+        CASE 
+          WHEN f.requester_id = $1 THEN u2.username
+          ELSE u1.username
+        END AS username,
+        CASE 
+          WHEN f.requester_id = $1 THEN u2.avatar_url
+          ELSE u1.avatar_url
+        END AS avatar_url,
+        COALESCE(
+          (SELECT COUNT(*) FROM submissions s 
+           WHERE s.user_id = CASE WHEN f.requester_id = $1 THEN u2.id ELSE u1.id END 
+           AND s.verdict = 'Accepted'), 0
+        ) AS solved_count,
+        0 AS current_streak,
+        false AS is_online
+       FROM friendships f
+       JOIN users u1 ON u1.id = f.requester_id
+       JOIN users u2 ON u2.id = f.addressee_id
+       WHERE (f.requester_id = $1 OR f.addressee_id = $1) 
+       AND f.status = 'accepted'
+       ORDER BY username`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /api/friends error:', err);
+    res.status(500).json({ error: 'Failed to load friends' });
+  }
+});
+
+// ─── DELETE /api/friends/:userId (unfriend) ─────────────────────────────────
+router.delete('/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ error: 'userId required' });
+    }
+
+    await dbPool.query(
+      `DELETE FROM friendships 
+       WHERE ((requester_id = $1 AND addressee_id = $2) 
+           OR (requester_id = $2 AND addressee_id = $1))
+       AND status = 'accepted'`,
+      [req.user.id, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/friends/:userId error:', err);
+    res.status(500).json({ error: 'Failed to unfriend' });
+  }
+});
+
+// ─── GET /api/friends/feed (activity feed) ──────────────────────────────────
+router.get('/feed', async (req, res) => {
+  try {
+    // Return empty array for now - can be implemented later
+    res.json([]);
+  } catch (err) {
+    console.error('GET /api/friends/feed error:', err);
+    res.status(500).json({ error: 'Failed to load feed' });
+  }
+});
+
+// ─── GET /api/friends/leaderboard ───────────────────────────────────────────
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const result = await dbPool.query(
+      `SELECT 
+        CASE 
+          WHEN f.requester_id = $1 THEN u2.id
+          ELSE u1.id
+        END AS id,
+        CASE 
+          WHEN f.requester_id = $1 THEN u2.username
+          ELSE u1.username
+        END AS username,
+        CASE 
+          WHEN f.requester_id = $1 THEN u2.avatar_url
+          ELSE u1.avatar_url
+        END AS avatar_url,
+        COALESCE(
+          (SELECT COUNT(*) FROM submissions s 
+           WHERE s.user_id = CASE WHEN f.requester_id = $1 THEN u2.id ELSE u1.id END 
+           AND s.verdict = 'Accepted'), 0
+        ) AS solved_count,
+        0 AS current_streak,
+        false AS is_online
+       FROM friendships f
+       JOIN users u1 ON u1.id = f.requester_id
+       JOIN users u2 ON u2.id = f.addressee_id
+       WHERE (f.requester_id = $1 OR f.addressee_id = $1) 
+       AND f.status = 'accepted'
+       ORDER BY solved_count DESC, username
+       LIMIT 50`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('GET /api/friends/leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
+  }
+});
+
+// ─── GET /api/friends/search/users (search for users to add) ────────────────
+router.get('/search/users', async (req, res) => {
+  try {
+    const query = req.query.q;
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      return res.json({ users: [] });
+    }
+
+    const result = await dbPool.query(
+      `SELECT 
+        u.id,
+        u.username,
+        u.avatar_url,
+        COALESCE(
+          (SELECT COUNT(*) FROM submissions s 
+           WHERE s.user_id = u.id AND s.verdict = 'Accepted'), 0
+        ) AS solved_count,
+        EXISTS(
+          SELECT 1 FROM friendships f 
+          WHERE ((f.requester_id = $1 AND f.addressee_id = u.id) 
+              OR (f.requester_id = u.id AND f.addressee_id = $1))
+          AND f.status = 'accepted'
+        ) AS is_friend,
+        EXISTS(
+          SELECT 1 FROM friendships f 
+          WHERE f.requester_id = $1 AND f.addressee_id = u.id 
+          AND f.status = 'pending'
+        ) AS request_sent
+       FROM users u
+       WHERE LOWER(u.username) LIKE LOWER($2) 
+       AND u.id != $1
+       ORDER BY u.username
+       LIMIT 20`,
+      [req.user.id, `%${query.trim()}%`]
+    );
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error('GET /api/friends/search/users error:', err);
+    res.status(500).json({ error: 'Failed to search users' });
+  }
+});
+
 export default router;

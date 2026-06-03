@@ -222,8 +222,6 @@ class DescriptionTab extends StatelessWidget {
             },
             inlineSyntaxes: [_SuperscriptSyntax()],
             selectable: false,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
           ),
           const SizedBox(height: 24),
 
@@ -354,8 +352,6 @@ class DescriptionTab extends StatelessWidget {
               },
               inlineSyntaxes: [_SuperscriptSyntax()],
               selectable: false,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
             ),
           ],
         ],

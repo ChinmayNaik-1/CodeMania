@@ -202,18 +202,29 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
           'input': inputs[i],
         });
 
-        if (status != 'Compile Error') {
-          if (caseStatus == 'Compile Error') {
+        // Update overall status - PRIORITY: Compile Error > Runtime Error > Wrong Answer > Accepted
+        // If ANY test case fails, the overall verdict must reflect that failure
+        if (!passed || caseStatus != 'Accepted') {
+          if (caseStatus == 'Compile Error' || errorMessage?.contains('CompileError') == true) {
             status = 'Compile Error';
             firstErrorMessage ??= errorMessage;
-          } else if (status != 'Runtime Error' && caseStatus == 'Runtime Error') {
-            status = 'Runtime Error';
-            firstErrorMessage ??= errorMessage;
-          } else if (status == 'Accepted' && caseStatus == 'Wrong Answer') {
-            status = 'Wrong Answer';
-          } else if (status == 'Accepted' && caseStatus == 'Time Limit Exceeded') {
-            status = 'Time Limit Exceeded';
-            firstErrorMessage ??= errorMessage;
+          } else if (caseStatus == 'Runtime Error' || errorMessage?.isNotEmpty == true) {
+            // Only set to Runtime Error if status isn't already Compile Error
+            if (status != 'Compile Error') {
+              status = 'Runtime Error';
+              firstErrorMessage ??= errorMessage;
+            }
+          } else if (caseStatus == 'Time Limit Exceeded') {
+            // Only set TLE if status isn't already Compile Error or Runtime Error
+            if (status != 'Compile Error' && status != 'Runtime Error') {
+              status = 'Time Limit Exceeded';
+              firstErrorMessage ??= errorMessage;
+            }
+          } else {
+            // Default to Wrong Answer for any other failure
+            if (status == 'Accepted') {
+              status = 'Wrong Answer';
+            }
           }
         }
       }
@@ -469,8 +480,13 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
 
           // Bottom action bar
           Container(
-            height: 56,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 56 + MediaQuery.of(context).padding.bottom,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              MediaQuery.of(context).padding.bottom,
+            ),
             decoration: BoxDecoration(
               color: colorScheme.surface,
               border: Border(top: BorderSide(color: colorScheme.outline)),
@@ -532,13 +548,24 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
         ],
       ),
       bottomSheet: consoleVisible && problem != null
-          ? TestcaseBottomSheet(
-              problem: problem,
-              problemId: widget.problemId,
-              onRun: _runCode,
-              onSubmit: _submitCode,
-              onClose: () {
-                ref.read(consoleSheetVisibleProvider.notifier).state = false;
+          ? Builder(
+              builder: (context) {
+                // Capture bottom padding before bottom sheet context
+                final bottomPadding = MediaQuery.of(context).padding.bottom;
+                return MediaQuery.removePadding(
+                  context: context,
+                  removeTop: true,
+                  child: TestcaseBottomSheet(
+                    problem: problem,
+                    problemId: widget.problemId,
+                    onRun: _runCode,
+                    onSubmit: _submitCode,
+                    onClose: () {
+                      ref.read(consoleSheetVisibleProvider.notifier).state = false;
+                    },
+                    systemBottomPadding: bottomPadding,
+                  ),
+                );
               },
             )
           : null,

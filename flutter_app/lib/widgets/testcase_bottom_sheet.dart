@@ -14,6 +14,7 @@ class TestcaseBottomSheet extends ConsumerWidget {
     required this.onRun,
     required this.onSubmit,
     required this.onClose,
+    this.systemBottomPadding = 0.0,
   });
 
   final Problem problem;
@@ -21,6 +22,7 @@ class TestcaseBottomSheet extends ConsumerWidget {
   final VoidCallback onRun;
   final VoidCallback onSubmit;
   final VoidCallback onClose;
+  final double systemBottomPadding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,7 +30,7 @@ class TestcaseBottomSheet extends ConsumerWidget {
     final selectedTab = ref.watch(consoleSheetTabProvider);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.5,
+      height: MediaQuery.of(context).size.height * 0.5 + systemBottomPadding,
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -89,8 +91,13 @@ class TestcaseBottomSheet extends ConsumerWidget {
                     problemId: problemId,
                     onRun: onRun,
                     onSubmit: onSubmit,
+                    systemBottomPadding: systemBottomPadding,
                   )
-                : _RunResultTab(problem: problem, problemId: problemId),
+                : _RunResultTab(
+                    problem: problem,
+                    problemId: problemId,
+                    systemBottomPadding: systemBottomPadding,
+                  ),
           ),
         ],
       ),
@@ -141,25 +148,38 @@ class _TabButton extends StatelessWidget {
 // Testcase Tab
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _TestcaseTab extends ConsumerWidget {
+class _TestcaseTab extends ConsumerStatefulWidget {
   const _TestcaseTab({
     required this.problem,
     required this.problemId,
     required this.onRun,
     required this.onSubmit,
+    this.systemBottomPadding = 0.0,
   });
 
   final Problem problem;
   final int problemId;
   final VoidCallback onRun;
   final VoidCallback onSubmit;
+  final double systemBottomPadding;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TestcaseTab> createState() => _TestcaseTabState();
+}
+
+class _TestcaseTabState extends ConsumerState<_TestcaseTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final testcases = ref.watch(testcaseProvider(problemId.toString()));
-    final selectedIndex = ref.watch(selectedCaseIndexProvider(problemId.toString()));
+    final testcases = ref.watch(testcaseProvider(widget.problemId.toString()));
+    final selectedIndex = ref.watch(selectedCaseIndexProvider(widget.problemId.toString()));
 
     if (testcases.isEmpty) {
       return const Center(child: Text('No test cases'));
@@ -184,7 +204,7 @@ class _TestcaseTab extends ConsumerWidget {
                 selected: isSelected,
                 onSelected: (selected) {
                   if (selected) {
-                    ref.read(selectedCaseIndexProvider(problemId.toString()).notifier).state = index;
+                    ref.read(selectedCaseIndexProvider(widget.problemId.toString()).notifier).state = index;
                   }
                 },
                 selectedColor: colorScheme.primary,
@@ -239,7 +259,12 @@ class _TestcaseTab extends ConsumerWidget {
 
         // Bottom buttons
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + widget.systemBottomPadding,
+          ),
           decoration: BoxDecoration(
             border: Border(top: BorderSide(color: colorScheme.outline)),
           ),
@@ -249,8 +274,8 @@ class _TestcaseTab extends ConsumerWidget {
                 child: OutlinedButton(
                   onPressed: () {
                     // Reset test cases to defaults
-                    final defaults = problem.examples.isNotEmpty
-                        ? problem.examples
+                    final defaults = widget.problem.examples.isNotEmpty
+                        ? widget.problem.examples
                             .map((example) => {
                                   'input': example.input,
                                   '_expectedOutput': example.expectedOutput,
@@ -259,8 +284,8 @@ class _TestcaseTab extends ConsumerWidget {
                         : <Map<String, String>>[
                             {'input': ''},
                           ];
-                    ref.read(testcaseProvider(problemId.toString()).notifier).initWithDefaults(defaults);
-                    ref.read(selectedCaseIndexProvider(problemId.toString()).notifier).state = 0;
+                    ref.read(testcaseProvider(widget.problemId.toString()).notifier).initWithDefaults(defaults);
+                    ref.read(selectedCaseIndexProvider(widget.problemId.toString()).notifier).state = 0;
                   },
                   child: const Text('Reset'),
                 ),
@@ -268,7 +293,7 @@ class _TestcaseTab extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: onRun,
+                  onPressed: widget.onRun,
                   icon: const Icon(Icons.play_arrow, size: 18),
                   label: const Text('Run'),
                   style: ElevatedButton.styleFrom(
@@ -279,7 +304,7 @@ class _TestcaseTab extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: onSubmit,
+                  onPressed: widget.onSubmit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF00B84C),
                     foregroundColor: Colors.white,
@@ -299,21 +324,34 @@ class _TestcaseTab extends ConsumerWidget {
 // Run Result Tab
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _RunResultTab extends ConsumerWidget {
+class _RunResultTab extends ConsumerStatefulWidget {
   const _RunResultTab({
     required this.problem,
     required this.problemId,
+    this.systemBottomPadding = 0.0,
   });
 
   final Problem problem;
   final int problemId;
+  final double systemBottomPadding;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RunResultTab> createState() => _RunResultTabState();
+}
+
+class _RunResultTabState extends ConsumerState<_RunResultTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final runResult = ref.watch(runResultProvider);
-    final selectedCaseIndex = ref.watch(selectedCaseIndexProvider(problemId.toString()));
+    final selectedCaseIndex = ref.watch(selectedCaseIndexProvider(widget.problemId.toString()));
 
     if (runResult == null) {
       return Center(
@@ -418,7 +456,7 @@ class _RunResultTab extends ConsumerWidget {
                   selected: isSelected,
                   onSelected: (selected) {
                     if (selected) {
-                      ref.read(selectedCaseIndexProvider(problemId.toString()).notifier).state = index;
+                      ref.read(selectedCaseIndexProvider(widget.problemId.toString()).notifier).state = index;
                     }
                   },
                   selectedColor: colorScheme.surfaceVariant,
@@ -432,7 +470,12 @@ class _RunResultTab extends ConsumerWidget {
           // Selected case details
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + widget.systemBottomPadding,
+              ),
               child: () {
                 if (selectedCaseIndex >= caseResults.length) {
                   return const Text('Invalid case selected');

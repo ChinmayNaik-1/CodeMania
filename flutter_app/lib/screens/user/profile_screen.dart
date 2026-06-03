@@ -44,6 +44,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         vsync: this, duration: const Duration(milliseconds: 400));
     _fade = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
+    
+    // Load friends list to get accurate count
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(friendsProvider.notifier).loadFriends();
+    });
   }
 
   @override
@@ -239,7 +244,7 @@ class _LeftPanel extends ConsumerWidget {
           const SizedBox(height: 16),
 
           // Stats row: Solved | Contests | Friends
-          _inlineStats(profile, context),
+          _inlineStats(profile, context, ref),
 
           const SizedBox(height: 16),
 
@@ -285,8 +290,10 @@ class _LeftPanel extends ConsumerWidget {
     );
   }
 
-  Widget _inlineStats(UserProfileModel p, BuildContext context) {
+  Widget _inlineStats(UserProfileModel p, BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final friendsState = ref.watch(friendsProvider);
+    final friendsCount = friendsState.friends.length;
     
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -297,30 +304,42 @@ class _LeftPanel extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          _statCell('${p.totalSolved}', 'Solved', context),
+          _statCell('${p.totalSolved}', 'Solved', context, onTap: null),
           _divider(context),
-          _statCell('${p.contestHistory.length}', 'Contests', context),
+          _statCell('${p.contestHistory.length}', 'Contests', context, onTap: null),
           _divider(context),
-          _statCell('0', 'Friends', context),
+          _statCell('$friendsCount', 'Friends', context, onTap: () {
+            context.push('/friends');
+          }),
         ],
       ),
     );
   }
 
-  Widget _statCell(String value, String label, BuildContext context) {
+  Widget _statCell(String value, String label, BuildContext context, {VoidCallback? onTap}) {
     final colorScheme = Theme.of(context).colorScheme;
     
-    return Expanded(
-        child: Column(
-          children: [
-            Text(value,
-                style: TextStyle(
-                    color: colorScheme.onBackground, fontWeight: FontWeight.w800, fontSize: 20)),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 11)),
-          ],
+    final child = Column(
+      children: [
+        Text(value,
+            style: TextStyle(
+                color: colorScheme.onBackground, fontWeight: FontWeight.w800, fontSize: 20)),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 11)),
+      ],
+    );
+    
+    if (onTap != null) {
+      return Expanded(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: child,
         ),
       );
+    }
+    
+    return Expanded(child: child);
   }
 
   Widget _divider(BuildContext context) =>
