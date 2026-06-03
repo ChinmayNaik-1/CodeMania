@@ -6,6 +6,7 @@ import 'package:codemania/providers/problem_provider.dart';
 import 'package:codemania/providers/submission_provider.dart';
 import 'package:codemania/core/theme/app_theme.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 
 class ProblemDetailScreen extends ConsumerStatefulWidget {
   const ProblemDetailScreen({
@@ -171,6 +172,58 @@ class DescriptionTab extends StatelessWidget {
           const SizedBox(height: 8),
           MarkdownBody(
             data: problem!.description,
+            styleSheet: MarkdownStyleSheet(
+              p: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onBackground,
+                height: 1.6,
+                fontSize: 15,
+              ),
+              code: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFE2E8F0)
+                    : const Color(0xFF1A1A2E),
+                backgroundColor: Colors.transparent,
+              ),
+              codeblockDecoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF2A2A3E)
+                    : const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              codeblockPadding: const EdgeInsets.all(12),
+              listBullet: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onBackground,
+              ),
+              h1: textTheme.headlineMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+              h2: textTheme.headlineSmall?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+              h3: textTheme.titleLarge?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+              strong: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontWeight: FontWeight.bold,
+              ),
+              em: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onBackground,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            builders: {
+              'code': _InlineCodeBuilder(context),
+            },
+            inlineSyntaxes: [_SuperscriptSyntax()],
+            selectable: false,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
           ),
           const SizedBox(height: 24),
 
@@ -263,6 +316,46 @@ class DescriptionTab extends StatelessWidget {
             const SizedBox(height: 8),
             MarkdownBody(
               data: problem!.constraints!,
+              styleSheet: MarkdownStyleSheet(
+                p: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  height: 1.6,
+                  fontSize: 15,
+                ),
+                code: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFFE2E8F0)
+                      : const Color(0xFF1A1A2E),
+                  backgroundColor: Colors.transparent,
+                ),
+                codeblockDecoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF2A2A3E)
+                      : const Color(0xFFEEEEEE),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                codeblockPadding: const EdgeInsets.all(12),
+                listBullet: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                ),
+                strong: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  fontWeight: FontWeight.bold,
+                ),
+                em: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onBackground,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              builders: {
+                'code': _InlineCodeBuilder(context),
+              },
+              inlineSyntaxes: [_SuperscriptSyntax()],
+              selectable: false,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
             ),
           ],
         ],
@@ -492,5 +585,74 @@ class EditorialTab extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Custom Markdown Builders
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Custom builder for inline code with rounded border and theme-aware styling
+class _InlineCodeBuilder extends MarkdownElementBuilder {
+  final BuildContext context;
+
+  _InlineCodeBuilder(this.context);
+
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark ? const Color(0xFF2A2A3E) : const Color(0xFFEEEEEE);
+    final borderColor = isDark ? const Color(0xFF4A4A5E) : const Color(0xFFDDDDDD);
+    final textColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF1A1A2E);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: borderColor,
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        element.textContent,
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: 13,
+          color: textColor,
+        ),
+      ),
+    );
+  }
+}
+
+/// Custom inline syntax that converts text like 10^4 to 10⁴ (superscript)
+class _SuperscriptSyntax extends md.InlineSyntax {
+  _SuperscriptSyntax() : super(r'(\w+)\^(\w+)');
+
+  static const _superMap = {
+    '0': '⁰',
+    '1': '¹',
+    '2': '²',
+    '3': '³',
+    '4': '⁴',
+    '5': '⁵',
+    '6': '⁶',
+    '7': '⁷',
+    '8': '⁸',
+    '9': '⁹',
+    'n': 'ⁿ',
+    'i': 'ⁱ',
+  };
+
+  @override
+  bool onMatch(md.InlineParser parser, Match match) {
+    final base = match[1]!;
+    final exp = match[2]!;
+    final superExp = exp.split('').map((c) => _superMap[c] ?? c).join();
+    final node = md.Text('$base$superExp');
+    parser.addNode(node);
+    return true;
   }
 }
