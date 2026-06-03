@@ -244,26 +244,16 @@ class _LeftPanel extends ConsumerWidget {
 
           const SizedBox(height: 16),
 
-          // Edit / Friend action button
-          SizedBox(
-            width: double.infinity,
-            child: isOwn
-                ? FilledButton.icon(
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_outlined, size: 16),
-                    label: const Text('Edit Profile'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _kAccent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                  )
-                : _FriendActionButton(
-                    profile: profile,
-                    userId: userId,
-                    onSnack: onSnack,
-                  ),
-          ),
+          // Friend action button (if not own profile)
+          if (!isOwn)
+            SizedBox(
+              width: double.infinity,
+              child: _FriendActionButton(
+                profile: profile,
+                userId: userId,
+                onSnack: onSnack,
+              ),
+            ),
 
           // Languages
           if (profile.languages.isNotEmpty) ...[

@@ -4,6 +4,44 @@ import { authMiddleware } from '../middleware/auth.js';
 import { getProfileData } from '../services/profileService.js';
 import { getRedisClient } from '../services/leaderboardService.js';
 import { getContestIo } from '../socket/contestSocket.js';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Configure multer for avatar uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads/avatars');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, `avatar-${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 const router = express.Router();
 
@@ -35,6 +73,114 @@ router.put('/profile', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Update name (username)
+router.put('/profile/name', async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username || username.trim().length === 0) {
+      return res.status(400).json({ error: 'Name cannot be empty' });
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      return res.status(400).json({ error: 'Name must be 3-20 characters (letters, numbers, underscores only)' });
+    }
+
+    // Check if username is already taken
+    const existing = await dbPool.query(
+      'SELECT id FROM users WHERE username = $1 AND id != $2',
+      [username, req.user.id]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'This name is already taken' });
+    }
+
+    const result = await dbPool.query(
+      'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, email, role, rating, avatar_url, google_uid',
+      [username, req.user.id]
+    );
+
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update username (CodeMania ID)
+router.put('/profile/username', async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username || username.trim().length === 0) {
+      return res.status(400).json({ error: 'CodeMania ID cannot be empty' });
+    }
+
+    if (username.length < 3) {
+      return res.status(400).json({ error: 'CodeMania ID must be at least 3 characters' });
+    }
+
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      return res.status(400).json({ error: 'CodeMania ID must be 3-20 characters (letters, numbers, underscores only)' });
+    }
+
+    // Check if username is already taken
+    const existing = await dbPool.query(
+      'SELECT id FROM users WHERE username = $1 AND id != $2',
+      [username, req.user.id]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ error: 'This CodeMania ID is already taken' });
+    }
+
+    const result = await dbPool.query(
+      'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, email, role, rating, avatar_url, google_uid',
+      [username, req.user.id]
+    );
+
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload avatar
+router.post('/profile/avatar', upload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Construct the avatar URL - this assumes the uploads folder is served statically
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    // Delete old avatar file if it exists
+    const oldAvatar = await dbPool.query(
+      'SELECT avatar_url FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (oldAvatar.rows[0]?.avatar_url) {
+      const oldPath = path.join(__dirname, '..', oldAvatar.rows[0].avatar_url);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Update user's avatar URL in database
+    const result = await dbPool.query(
+      'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, username, email, role, rating, avatar_url, google_uid',
+      [avatarUrl, req.user.id]
+    );
+
+    res.json({ success: true, avatar_url: avatarUrl, user: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 router.get('/friends', async (req, res) => {
   try {

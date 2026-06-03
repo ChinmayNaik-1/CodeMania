@@ -33,62 +33,161 @@ class SettingsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile card
-              InkWell(
-                onTap: () {
-                  if (user != null) {
-                    context.push('/profile/${user.id}');
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: colorScheme.primary.withOpacity(0.2),
-                        child: Text(
-                          user?.username.isNotEmpty == true
-                              ? user!.username[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
+              // Edit Profile section (first section - only for logged in users)
+              if (user != null) ...[
+                InkWell(
+                  onTap: () {
+                    context.push('/settings/edit-profile');
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        // Avatar with Edit text below
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundColor: colorScheme.primary.withOpacity(0.2),
+                          child: Text(
+                            user.username.isNotEmpty
+                                ? user.username[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 28,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.username ?? 'Guest',
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'Profile, Password, Email',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Edit',
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.6)),
-                    ],
+                        const SizedBox(height: 16),
+                        // Name row
+                        _ProfileInfoRow(
+                          label: 'Name',
+                          value: user.username,
+                          onTap: () => context.push('/settings/edit-name'),
+                        ),
+                        Divider(height: 1, color: colorScheme.outline),
+                        // CodeMania ID row
+                        _ProfileInfoRow(
+                          label: 'CodeMania ID',
+                          value: user.username,
+                          onTap: () => context.push('/settings/edit-codemania-id'),
+                        ),
+                        Divider(height: 1, color: colorScheme.outline),
+                        // Primary Email row
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Primary Email',
+                                style: textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Flexible(
+                                child: Text(
+                                  user.email ?? 'Not set',
+                                  textAlign: TextAlign.right,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurface.withOpacity(0.7),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                // Account Settings row
+                InkWell(
+                  onTap: () => context.push('/settings/dummy', extra: 'Account Settings'),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Account Settings',
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.6)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
 
-              const SizedBox(height: 24),
+              // Profile card (kept for non-logged in state)
+              if (user == null)
+                InkWell(
+                  onTap: () => context.go('/login'),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: colorScheme.primary.withOpacity(0.2),
+                          child: Icon(Icons.person, color: colorScheme.primary),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Sign In',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Access your profile',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.6)),
+                      ],
+                    ),
+                  ),
+                ),
+
+              if (user == null) const SizedBox(height: 24),
 
               // Subscription section
               Text(
@@ -362,6 +461,60 @@ class _SettingsRow extends StatelessWidget {
             ),
             trailing ??
                 Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.6)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileInfoRow extends StatelessWidget {
+  const _ProfileInfoRow({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: colorScheme.onSurface.withOpacity(0.6)),
+              ],
+            ),
           ],
         ),
       ),

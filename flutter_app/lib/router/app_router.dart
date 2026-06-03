@@ -14,6 +14,9 @@ import 'package:codemania/screens/user/profile_screen.dart';
 import 'package:codemania/features/friends/screens/friends_screen.dart';
 import 'package:codemania/screens/settings/settings_screen.dart';
 import 'package:codemania/screens/settings/dummy_settings_page.dart';
+import 'package:codemania/screens/settings/edit_profile_screen.dart';
+import 'package:codemania/screens/settings/edit_name_screen.dart';
+import 'package:codemania/screens/settings/edit_codemania_id_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -136,6 +139,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/edit-profile',
+        name: 'editProfile',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/settings/edit-name',
+        name: 'editName',
+        builder: (context, state) => const EditNameScreen(),
+      ),
+      GoRoute(
+        path: '/settings/edit-codemania-id',
+        name: 'editCodeManiaId',
+        builder: (context, state) => const EditCodeManiaIdScreen(),
       ),
       GoRoute(
         path: '/settings/dummy',

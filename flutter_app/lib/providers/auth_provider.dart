@@ -247,6 +247,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = const AuthState();
     }
   }
+
+  void updateUser(UserModel updatedUser) {
+    state = state.copyWith(user: updatedUser);
+  }
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
