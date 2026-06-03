@@ -9,7 +9,6 @@ import 'package:codemania/screens/auth/register_screen.dart';
 import 'package:codemania/features/contests/screens/contest_detail_screen.dart';
 import 'package:codemania/features/contests/screens/contest_problem_screen.dart';
 import 'package:codemania/screens/problem_page/problem_page.dart';
-import 'package:codemania/screens/public/landing_screen.dart';
 import 'package:codemania/screens/user/home_screen.dart';
 import 'package:codemania/screens/user/profile_screen.dart';
 import 'package:codemania/features/friends/screens/friends_screen.dart';
@@ -19,14 +18,9 @@ import 'package:go_router/go_router.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/home',
     debugLogDiagnostics: true,
     routes: [
-      GoRoute(
-        path: '/',
-        name: 'landing',
-        builder: (context, state) => const LandingScreen(),
-      ),
       GoRoute(
         path: '/login',
         name: 'login',
@@ -104,7 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/problems',
         name: 'problemList',
-        builder: (context, state) => const HomeScreen(initialTab: 1),
+        builder: (context, state) => const HomeScreen(initialTab: 2),
       ),
       GoRoute(
         path: '/problems/:id',
@@ -117,7 +111,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/contests',
         name: 'contestList',
-        builder: (context, state) => const HomeScreen(initialTab: 2),
+        builder: (context, state) => const HomeScreen(initialTab: 1),
       ),
       GoRoute(
         path: '/contests/:contestId',
@@ -138,6 +132,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, routerState) {
+      // No redirect logic - app is accessible without login
       return null;
     },
     errorBuilder: (context, state) => Scaffold(
@@ -160,7 +155,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => context.go('/'),
+              onPressed: () => context.go('/home'),
               child: const Text('Go Home'),
             ),
           ],

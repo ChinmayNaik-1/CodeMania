@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:codemania/providers/auth_provider.dart';
+import 'package:codemania/core/theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late final TextEditingController _emailController;
   late final TextEditingController _passwordController;
   bool _isNavigating = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -33,7 +35,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -51,9 +53,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (error != null && mounted) {
       _showError(error);
     } else if (!_isNavigating && mounted) {
-      // Login successful - navigate based on user role
       _isNavigating = true;
-      // Use a small delay to ensure state updates have propagated
       await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
 
@@ -95,432 +95,179 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F8),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 980;
-
-            return Row(
-              children: [
-                if (isWide) const Expanded(flex: 5, child: _PurpleShowcase()),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(28),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 460),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _AuthSwitcher(
-                              active: _AuthTab.login,
-                              onLoginTap: () => context.go('/login'),
-                              onSignupTap: () => context.go('/register'),
-                            ),
-                            const SizedBox(height: 22),
-                            const Text(
-                              'Welcome back',
-                              style: TextStyle(
-                                fontSize: 42,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF161A2C),
-                                letterSpacing: -1,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Pick up where you left off.',
-                              style: TextStyle(
-                                  color: Color(0xFF6B7280), fontSize: 16),
-                            ),
-                            const SizedBox(height: 22),
-                            OutlinedButton.icon(
-                              onPressed: authState.isLoading
-                                  ? null
-                                  : () => _handleGoogleSignIn(ref),
-                              icon: const Icon(Icons.g_mobiledata, size: 22),
-                              label: const Text('Continue with Google'),
-                            ),
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                const Expanded(child: Divider()),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Text(
-                                    'or login with email',
-                                    style:
-                                        TextStyle(color: Colors.grey.shade600),
-                                  ),
-                                ),
-                                const Expanded(child: Divider()),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Email address',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2A2F44)),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _emailController,
-                              enabled: !authState.isLoading,
-                              decoration: const InputDecoration(
-                                hintText: 'name@company.com',
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Password',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2A2F44)),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: _passwordController,
-                              enabled: !authState.isLoading,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                hintText: 'Enter your password',
-                                filled: true,
-                                fillColor: Colors.white,
-                              ),
-                            ),
-                            if (authState.error != null) ...[
-                              const SizedBox(height: 14),
-                              Text(
-                                authState.error!,
-                                style: const TextStyle(color: Colors.red),
-                              ),
-                            ],
-                            const SizedBox(height: 22),
-                            FilledButton(
-                              onPressed: authState.isLoading
-                                  ? null
-                                  : () => _handleLogin(ref),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF6D38F8),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 18),
-                              ),
-                              child: authState.isLoading
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Log In'),
-                            ),
-                            const SizedBox(height: 18),
-                            TextButton(
-                              onPressed: () => context.go('/register'),
-                              child: const Text(
-                                  "Don't have an account? Create one"),
-                            ),
-                            TextButton(
-                              onPressed: () => context.go('/'),
-                              child: const Text('Back to Home'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _PurpleShowcase extends StatelessWidget {
-  const _PurpleShowcase();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(-0.4, -0.2),
-          radius: 1.15,
-          colors: [
-            Color(0xFF9E74FF),
-            Color(0xFF6A37EB),
-            Color(0xFF4A1FAF),
-          ],
-          stops: [0.0, 0.42, 1.0],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -100,
-            left: -120,
-            child: Container(
-              width: 360,
-              height: 360,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -140,
-            right: -80,
-            child: Container(
-              width: 380,
-              height: 380,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '<Codemania/>',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 30,
-                  ),
-                ),
-                const Spacer(),
-                const Text(
-                  'Code. Compete.\nConquer.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 72,
-                    height: 0.95,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -2,
-                  ),
-                ),
-                const SizedBox(height: 26),
-                const _Pitch(
-                  icon: Icons.code,
-                  text: '500+ problems from beginner to expert',
-                ),
-                const _Pitch(
-                  icon: Icons.emoji_events_outlined,
-                  text: 'Weekly contests and global prizes',
-                ),
-                const _Pitch(
-                  icon: Icons.stacked_line_chart,
-                  text: 'Real-time dynamic leaderboard',
-                ),
-                const SizedBox(height: 28),
-                Container(
-                  width: 360,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(20),
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                  ),
-                  child: const Column(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            '1',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'AlexDev',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '2450',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Text(
-                            '2',
-                            style: TextStyle(
-                              color: Color(0xFFE7DDFF),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'ByteMaster',
-                              style: TextStyle(
-                                color: Color(0xFFEDE6FF),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '2380',
-                            style: TextStyle(
-                              color: Color(0xFFEDE6FF),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+                      IconButton(
+                        onPressed: () => context.pop(),
+                        icon: Icon(Icons.close, color: colorScheme.onBackground),
                       ),
                     ],
                   ),
-                ),
-                const Spacer(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Pitch extends StatelessWidget {
-  const _Pitch({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white70),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(text,
-                  style: const TextStyle(color: Colors.white, fontSize: 18))),
-        ],
-      ),
-    );
-  }
-}
-
-enum _AuthTab { login, signup }
-
-class _AuthSwitcher extends StatelessWidget {
-  const _AuthSwitcher({
-    required this.active,
-    required this.onLoginTap,
-    required this.onSignupTap,
-  });
-
-  final _AuthTab active;
-  final VoidCallback onLoginTap;
-  final VoidCallback onSignupTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 270,
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE1E5EE),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: [
-          _AuthSwitcherButton(
-            label: 'Log In',
-            selected: active == _AuthTab.login,
-            onTap: onLoginTap,
-          ),
-          _AuthSwitcherButton(
-            label: 'Sign Up',
-            selected: active == _AuthTab.signup,
-            onTap: onSignupTap,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AuthSwitcherButton extends StatelessWidget {
-  const _AuthSwitcherButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF5C2CD5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: selected
-              ? const [
-                  BoxShadow(
-                    color: Color(0x402F136F),
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Text(
+                      '{ }',
+                      style: textTheme.displayLarge?.copyWith(
+                        color: colorScheme.primary,
+                      ),
+                    ),
                   ),
-                ]
-              : null,
-        ),
-        child: TextButton(
-          onPressed: onTap,
-          style: TextButton.styleFrom(
-            foregroundColor: selected ? Colors.white : const Color(0xFF637088),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Start CodeMania',
+                    textAlign: TextAlign.center,
+                    style: textTheme.displayMedium,
+                  ),
+                  const SizedBox(height: 32),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _emailController,
+                          enabled: !authState.isLoading,
+                          style: TextStyle(color: colorScheme.onSurface),
+                          decoration: InputDecoration(
+                            hintText: 'Email or Username',
+                            hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.6)),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        Divider(color: colorScheme.outline, height: 24),
+                        TextField(
+                          controller: _passwordController,
+                          enabled: !authState.isLoading,
+                          obscureText: _obscurePassword,
+                          style: TextStyle(color: colorScheme.onSurface),
+                          decoration: InputDecoration(
+                            hintText: 'Password',
+                            hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.6)),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                color: colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: authState.isLoading ? null : () => _handleLogin(ref),
+                      child: authState.isLoading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: colorScheme.onPrimary,
+                              ),
+                            )
+                          : const Text('Sign in'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text('Forgot password?'),
+                      ),
+                      const SizedBox(width: 16),
+                      TextButton(
+                        onPressed: () => context.go('/register'),
+                        child: const Text('Create Account'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _SocialButton(
+                        icon: Icons.code,
+                        onTap: () {},
+                      ),
+                      const SizedBox(width: 16),
+                      _SocialButton(
+                        label: 'G',
+                        onTap: authState.isLoading ? null : () => _handleGoogleSignIn(ref),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({this.icon, this.label, this.onTap});
+
+  final IconData? icon;
+  final String? label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: icon != null
+              ? Icon(icon, color: colorScheme.onSurface)
+              : Text(
+                  label ?? '',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
         ),
       ),
     );

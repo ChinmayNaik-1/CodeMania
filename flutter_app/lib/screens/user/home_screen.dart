@@ -1,12 +1,13 @@
 import 'package:codemania/models/problem_model.dart';
 import 'package:codemania/providers/auth_provider.dart';
 import 'package:codemania/providers/problem_provider.dart';
+import 'package:codemania/providers/submission_provider.dart';
 import 'package:codemania/features/contests/providers/contest_provider.dart';
 import 'package:codemania/core/models/contest_model.dart';
 import 'package:codemania/features/contests/screens/contests_screen.dart';
 import 'package:codemania/screens/user/problem_list_screen.dart';
-
-import 'package:codemania/services/socket_service.dart';
+import 'package:codemania/screens/user/profile_screen.dart';
+import 'package:codemania/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,62 +38,79 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final authState = ref.watch(authProvider);
     final problemState = ref.watch(problemListProvider);
     final user = authState.user;
-    final isCompact = MediaQuery.of(context).size.width < 1080;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final pages = [
-      _DashboardPage(problemState: problemState),
+      _LibraryPage(problemState: problemState),
+      const ContestsScreen(embedded: true),
       ProblemListScreen(
         embedded: true,
         onOpenProblem: _openProblem,
       ),
-      const ContestsScreen(embedded: true),
-      const SizedBox.shrink(),
+      user != null
+          ? ProfileScreen(userId: user.id)
+          : _SignInPromptPage(),
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F3FB),
-      drawer: isCompact
-          ? Drawer(
-              child: SafeArea(
-                child: _SideRail(
-                  selectedIndex: _selectedIndex,
-                  onItemTap: _selectTab,
-                ),
-              ),
-            )
-          : null,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
+        child: pages[_selectedIndex],
+      ),
+      bottomNavigationBar: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          border: Border(
+            top: BorderSide(color: colorScheme.outline, width: 1),
+          ),
+        ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            if (!isCompact)
-              SizedBox(
-                width: 220,
-                child: _SideRail(
-                  selectedIndex: _selectedIndex,
-                  onItemTap: _selectTab,
-                ),
+            _buildNavItem(0, Icons.menu_book_outlined, 'Library'),
+            _buildNavItem(1, Icons.emoji_events_outlined, 'Contests'),
+            _buildNavItem(2, Icons.search, 'Search'),
+            _buildNavItem(3, Icons.person_outline, 'You'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isActive = _selectedIndex == index;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    
+    return Expanded(
+      child: InkWell(
+        onTap: () => _selectTab(index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isActive ? AppTheme.activeTab : Colors.transparent,
+                shape: BoxShape.circle,
               ),
-            Expanded(
-              child: Column(
-                children: [
-                  _TopBar(
-                    username: user?.username ?? 'Coder',
-                    rating: user?.rating ?? 1200,
-                    onMenuTap: isCompact
-                        ? () => Scaffold.of(context).openDrawer()
-                        : null,
-                    onLogout: () => _confirmLogout(context, ref),
-                  ),
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: KeyedSubtree(
-                        key: ValueKey<int>(_selectedIndex),
-                        child: pages[_selectedIndex],
-                      ),
-                    ),
-                  ),
-                ],
+              child: Icon(
+                icon,
+                color: isActive
+                    ? colorScheme.onPrimary
+                    : colorScheme.onSurface.withOpacity(0.6),
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: textTheme.labelSmall?.copyWith(
+                color: isActive
+                    ? colorScheme.onBackground
+                    : colorScheme.onSurface.withOpacity(0.6),
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],
@@ -102,61 +120,415 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _selectTab(int index) {
-    const tabRoutes = ['/home', '/problems', '/contests', '/friends'];
-    final targetRoute = tabRoutes[index];
-    final currentRoute = ModalRoute.of(context)?.settings.name;
-
-    if (currentRoute == targetRoute) {
-      if (_selectedIndex != index) {
-        setState(() {
-          _selectedIndex = index;
-        });
+    // Handle "You" tab (index 3) - check authentication
+    if (index == 3) {
+      final authState = ref.read(authProvider);
+      if (authState.user == null) {
+        // Not logged in, navigate to login
+        context.go('/login');
+        return;
       }
-
-      final scaffold = Scaffold.maybeOf(context);
-      if (scaffold?.isDrawerOpen ?? false) {
-        context.pop();
-      }
-      return;
     }
-
-    context.go(targetRoute);
+    
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   void _openProblem(ProblemModel problem) {
     ref.read(problemListProvider.notifier).fetchProblemById(problem.id);
     context.go('/problems/${problem.id}');
   }
+}
 
-  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => ctx.pop(false),
-            child: const Text('Cancel'),
+class _LibraryPage extends ConsumerWidget {
+  const _LibraryPage({required this.problemState});
+
+  final ProblemState problemState;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final contestsAsync = ref.watch(contestListProvider);
+    final submissionsAsync = AsyncValue.data([]);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Library',
+            style: textTheme.displayMedium,
           ),
-          TextButton(
-            onPressed: () => ctx.pop(true),
-            child: const Text(
-              'Logout',
-              style: TextStyle(color: Colors.red),
+          const SizedBox(height: 16),
+          // Banner card
+          InkWell(
+            onTap: () => context.go('/contests'),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [colorScheme.primary, Color(0xFFFF8C00)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Active Contests',
+                      style: textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.emoji_events, color: Colors.white, size: 32),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Problems section
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Problems', style: textTheme.headlineSmall),
+              InkWell(
+                onTap: () => context.go('/problems'),
+                child: Icon(Icons.arrow_forward, color: colorScheme.onSurface.withOpacity(0.6)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _DifficultyCard(
+                  label: 'Easy',
+                  count: problemState.problems.where((p) => p.difficulty == 'Easy').length,
+                  color: AppTheme.getDifficultyColor('easy', isDark),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DifficultyCard(
+                  label: 'Medium',
+                  count: problemState.problems.where((p) => p.difficulty == 'Medium').length,
+                  color: AppTheme.getDifficultyColor('medium', isDark),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DifficultyCard(
+                  label: 'Hard',
+                  count: problemState.problems.where((p) => p.difficulty == 'Hard').length,
+                  color: AppTheme.getDifficultyColor('hard', isDark),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Recent Submissions
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Recent Submissions', style: textTheme.headlineSmall),
+              Icon(Icons.arrow_forward, color: colorScheme.onSurface.withOpacity(0.6)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          submissionsAsync.when(
+            data: (submissions) {
+              final recent = submissions.take(3).toList();
+              if (recent.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'No submissions yet',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: recent.map((sub) {
+                  final isAccepted = sub.verdict?.toLowerCase().contains('accept') ?? false;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            sub.problemTitle ?? 'Problem',
+                            style: textTheme.titleMedium,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.getVerdictColor(sub.verdict ?? '', isDark),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            sub.verdict ?? 'Unknown',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatTime(sub.submittedAt),
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+            loading: () => CircularProgressIndicator(color: colorScheme.primary),
+            error: (e, s) => Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No submissions yet',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Contests
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Contests', style: textTheme.headlineSmall),
+              Icon(Icons.arrow_forward, color: colorScheme.onSurface.withOpacity(0.6)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          contestsAsync.when(
+            data: (contestsList) {
+              final upcoming = [...?contestsList['upcoming']].take(2).toList();
+              if (upcoming.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'No upcoming contests',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: upcoming.map((contest) => _ContestCard(contest: contest)).toList(),
+              );
+            },
+            loading: () => CircularProgressIndicator(color: colorScheme.primary),
+            error: (e, s) => Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'No contests available',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
             ),
           ),
         ],
       ),
     );
+  }
 
-    if (confirmed == true) {
-      SocketService.disconnect();
-      await ref.read(authProvider.notifier).logout();
-      if (mounted) {
-        context.go('/');
-      }
-    }
+  String _formatTime(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
+}
+
+class _DifficultyCard extends StatelessWidget {
+  const _DifficultyCard({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  final String label;
+  final int count;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    
+    return Container(
+      height: 80,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: textTheme.titleSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$count',
+            style: textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContestCard extends StatelessWidget {
+  const _ContestCard({required this.contest});
+
+  final ContestModel contest;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            contest.title,
+            style: textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _formatDateTime(contest.startTime),
+            style: textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _getCountdown(contest.startTime),
+            style: textTheme.titleSmall?.copyWith(
+              color: colorScheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _getCountdown(DateTime startTime) {
+    final now = DateTime.now();
+    final diff = startTime.difference(now);
+    if (diff.isNegative) return 'Started';
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    return 'Starts in ${hours}h ${minutes}m';
+  }
+}
+
+class _SignInPromptPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.person_outline,
+              size: 80,
+              color: colorScheme.onSurface.withOpacity(0.4),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Sign in to track your progress',
+              textAlign: TextAlign.center,
+              style: textTheme.titleLarge?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: () => context.go('/login'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              ),
+              child: const Text('Sign In'),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => context.go('/register'),
+              child: const Text('Create an account'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

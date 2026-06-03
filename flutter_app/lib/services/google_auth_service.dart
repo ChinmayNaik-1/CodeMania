@@ -1,26 +1,11 @@
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:async';
-import 'dart:js' as js;
-import 'package:js/js.dart';
-
-// JavaScript interop definitions for Google Identity Services
-@JS('window.triggerGoogleSignIn')
-external void _jsExternalTriggerGoogleSignIn();
 
 bool _registerWebJsBridge() {
   if (!kIsWeb) return false;
-
-  try {
-    js.context['dartCompleteGoogleSignIn'] = allowInterop((String credential) {
-      GoogleAuthService.completeWebSignIn(credential);
-    });
-    if (kDebugMode) print('🔐 [SETUP] Dart completeWebSignIn exposed to JavaScript');
-    return true;
-  } catch (e) {
-    if (kDebugMode) print('🔐 [SETUP-ERROR] $e');
-    return false;
-  }
+  // JS bridge registration is handled via a separate web-only file
+  return false;
 }
 
 final bool _webJsBridgeInitialized = _registerWebJsBridge();
@@ -42,6 +27,8 @@ class GoogleAuthService {
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId:
+        '745626973988-s5f7s7fo4ea28s430354odulsagdjlcm.apps.googleusercontent.com',
   );
 
   static void _setupWebCallbacks() {
@@ -89,16 +76,7 @@ class GoogleAuthService {
 
   static void _callJSFunction() {
     if (!kIsWeb) return;
-    
-    try {
-      if (kDebugMode) print('🔐 [JS-CALL] Invoking triggerGoogleSignIn');
-      _jsExternalTriggerGoogleSignIn();
-    } catch (e) {
-      if (kDebugMode) print('🔐 [JS-CALL-ERROR] Error: $e');
-      if (_webSignInCompleter != null && !_webSignInCompleter!.isCompleted) {
-        _webSignInCompleter!.complete(null);
-      }
-    }
+    // no-op on non-web; web uses HtmlElementView + JS interop separately
   }
 
   // These static methods are called by JavaScript
