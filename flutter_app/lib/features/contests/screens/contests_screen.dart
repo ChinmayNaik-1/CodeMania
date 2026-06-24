@@ -197,13 +197,13 @@ class _TopBar extends StatelessWidget {
 
 // ─── _ContestList ─────────────────────────────────────────────────────────────
 
-class _ContestList extends StatelessWidget {
+class _ContestList extends ConsumerWidget {
   const _ContestList({required this.contests, required this.type});
   final List<ContestModel> contests;
   final String type; // 'upcoming' | 'live' | 'ended'
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     
     if (contests.isEmpty) {
