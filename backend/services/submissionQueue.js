@@ -1,4 +1,4 @@
-import Bull from 'bull';
+import { InMemoryQueue } from './inMemoryQueue.js';
 import { judgeSubmission } from './judgeService.js';
 import { publishContestEvent } from './leaderboardService.js';
 import {
@@ -10,30 +10,12 @@ import { recordActivity } from './profileService.js';
 import { recordContestSubmission } from './contestService.js';
 
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const queueName = 'submission-queue';
 
-function getQueueRedisConfig() {
-  const parsed = new URL(redisUrl);
-  const useTls = parsed.protocol === 'rediss:';
-  return {
-    host: parsed.hostname,
-    port: parseInt(parsed.port || '6379', 10),
-    username: parsed.username || undefined,
-    password: parsed.password || undefined,
-    db: parsed.pathname && parsed.pathname !== '/' ? parseInt(parsed.pathname.slice(1), 10) : 0,
-    tls: useTls ? {} : undefined,
-  };
-}
-
-export const submissionQueue = new Bull(queueName, {
-  redis: getQueueRedisConfig(),
-  defaultJobOptions: {
-    removeOnComplete: true,
-    removeOnFail: false,
-    attempts: 1,
-  },
-});
+// In-memory queue: no Redis/Upstash connection, no continuous polling.
+// Jobs are processed in-process with a concurrency limit, preserving the
+// previous Bull behaviour (process(2, ...)) without burning Upstash quota.
+export const submissionQueue = new InMemoryQueue(queueName);
 
 let queueInitialized = false;
 

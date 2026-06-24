@@ -1,15 +1,30 @@
 import redis from 'redis';
 
-const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-});
+// Redis is OPT-IN. Leave REDIS_ENABLED unset (or "false") to run entirely without
+// Upstash/Redis. This prevents accidental quota usage: all leaderboard reads fall
+// back to PostgreSQL (see contestService.getLeaderboard) and presence uses an
+// in-memory store. Only set REDIS_ENABLED=true when you have quota to spare.
+const REDIS_ENABLED = String(process.env.REDIS_ENABLED || '').toLowerCase() === 'true';
 
-redisClient.on('error', (err) => console.error('Redis error:', err));
-redisClient.on('connect', () => console.log('Redis connected'));
+let redisClient = null;
+let redisReady = false;
+
+if (REDIS_ENABLED) {
+  redisClient = redis.createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  });
+  redisClient.on('error', (err) => console.error('Redis error:', err));
+  redisClient.on('connect', () => console.log('Redis connected'));
+}
 
 export async function initRedis() {
+  if (!REDIS_ENABLED) {
+    console.log('ℹ️  Redis disabled (REDIS_ENABLED not set). Using PostgreSQL + in-memory fallbacks.');
+    return;
+  }
   try {
     await redisClient.connect();
+    redisReady = true;
   } catch (error) {
     console.error('Failed to connect to Redis:', error);
     throw error;
@@ -17,6 +32,7 @@ export async function initRedis() {
 }
 
 export async function updateTeamScore(contestId, teamId, points) {
+  if (!redisReady) return;
   try {
     const leaderboardKey = `leaderboard:${contestId}`;
     await redisClient.zIncrBy(leaderboardKey, points, teamId.toString());
@@ -27,10 +43,11 @@ export async function updateTeamScore(contestId, teamId, points) {
 }
 
 export async function getLeaderboard(contestId, limit = 100) {
+  if (!redisReady) return [];
   try {
     const leaderboardKey = `leaderboard:${contestId}`;
     const scores = await redisClient.zRevRange(leaderboardKey, 0, limit - 1, { withScores: true });
-    
+
     const result = [];
     for (let i = 0; i < scores.length; i += 2) {
       result.push({
@@ -46,6 +63,7 @@ export async function getLeaderboard(contestId, limit = 100) {
 }
 
 export async function publishContestEvent(contestId, event) {
+  if (!redisReady) return;
   try {
     const channel = `codemania:contest:${contestId}`;
     await redisClient.publish(channel, JSON.stringify(event));
@@ -55,6 +73,7 @@ export async function publishContestEvent(contestId, event) {
 }
 
 export async function incrementSolvedCount(contestId, teamId) {
+  if (!redisReady) return;
   try {
     const key = `team:${contestId}:${teamId}:solved`;
     await redisClient.incr(key);
@@ -65,6 +84,7 @@ export async function incrementSolvedCount(contestId, teamId) {
 }
 
 export async function getSolvedCount(contestId, teamId) {
+  if (!redisReady) return 0;
   try {
     const key = `team:${contestId}:${teamId}:solved`;
     const count = await redisClient.get(key);
@@ -75,6 +95,8 @@ export async function getSolvedCount(contestId, teamId) {
   }
 }
 
+// Returns the live Redis client only when connected, otherwise null.
+// Callers MUST guard with `if (redis)` so they fall back to the database.
 export function getRedisClient() {
-  return redisClient;
+  return redisReady ? redisClient : null;
 }

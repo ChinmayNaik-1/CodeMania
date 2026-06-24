@@ -2,7 +2,7 @@ import express from 'express';
 import { dbPool } from '../index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { getProfileData } from '../services/profileService.js';
-import { getRedisClient } from '../services/leaderboardService.js';
+import { isOnline } from '../services/presenceStore.js';
 import { getContestIo } from '../socket/contestSocket.js';
 import multer from 'multer';
 import path from 'path';
@@ -200,10 +200,8 @@ router.get('/friends', async (req, res) => {
       [req.user.id]
     );
     const friends = result.rows;
-    const redis = getRedisClient();
     for (let f of friends) {
-      const isOnline = await redis.get(`online:${f.id}`);
-      f.is_online = !!isOnline;
+      f.is_online = isOnline(f.id);
       f.solved_count = parseInt(f.solved_count, 10) || 0;
     }
     res.json(friends);
