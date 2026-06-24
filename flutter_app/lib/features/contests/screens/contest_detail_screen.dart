@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:codemania/core/models/contest_model.dart';
 import 'package:codemania/features/contests/providers/contest_provider.dart';
 import 'package:codemania/providers/auth_provider.dart';
@@ -9,22 +11,59 @@ import 'package:codemania/services/socket_service.dart';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const _kPrimary = Color(0xFF6C5CE7);
-const _kBg = Color(0xFFF5F3FF);
+const _kBg = Color(0xFFF7F7FB);
 const _kSurface = Colors.white;
 const _kTextPri = Color(0xFF1A1A2E);
 const _kTextSec = Color(0xFF6B7280);
 const _kAccepted = Color(0xFF00B8A3);
 const _kError = Color(0xFFFF375F);
+const _kPoints = Color(0xFFFF9F1C);
 const _kEasy = Color(0xFF00B8A3);
 const _kMedium = Color(0xFFFFA116);
 const _kHard = Color(0xFFFF375F);
+
+// Status visuals
+Color _statusColor(String s) {
+  switch (s) {
+    case 'live':
+      return _kAccepted;
+    case 'upcoming':
+      return _kPrimary;
+    case 'ended':
+    default:
+      return _kTextSec;
+  }
+}
+
+String _statusLabel(String s) {
+  switch (s) {
+    case 'live':
+      return 'Live';
+    case 'upcoming':
+      return 'Upcoming';
+    case 'ended':
+    default:
+      return 'Ended';
+  }
+}
+
+String _formatContestDate(DateTime utc) {
+  final local = utc.toLocal();
+  final base = DateFormat('EEE, MMM d, HH:mm').format(local);
+  final offset = local.timeZoneOffset;
+  final sign = offset.isNegative ? '-' : '+';
+  final h = offset.inHours.abs();
+  final m = (offset.inMinutes.abs() % 60);
+  final off = m == 0 ? '$h' : '$h${m.toString().padLeft(2, '0')}';
+  return '$base GMT$sign$off';
+}
 
 BoxDecoration _cardDeco() => BoxDecoration(
       color: _kSurface,
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, 4))
       ],
@@ -40,39 +79,33 @@ class ContestDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync =
-        ref.watch(contestDetailProvider(contestId));
+    final detailAsync = ref.watch(contestDetailProvider(contestId));
 
     return detailAsync.when(
-      loading: () => Scaffold(
+      loading: () => const Scaffold(
         backgroundColor: _kBg,
-        appBar: AppBar(
-          backgroundColor: _kSurface,
-          elevation: 0,
-          title: const Text('Loading…', style: TextStyle(color: _kTextPri)),
-        ),
-        body: const Center(
-            child: CircularProgressIndicator(color: _kPrimary)),
+        body: Center(child: CircularProgressIndicator(color: _kPrimary)),
       ),
       error: (e, _) => Scaffold(
         backgroundColor: _kBg,
         appBar: AppBar(backgroundColor: _kSurface, elevation: 0),
         body: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text('Failed to load contest',
-                style: const TextStyle(color: _kTextSec)),
+            const Text('Failed to load contest',
+                style: TextStyle(color: _kTextSec)),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () =>
                   ref.read(contestDetailProvider(contestId).notifier).refresh(),
               style: ElevatedButton.styleFrom(backgroundColor: _kPrimary),
-              child: const Text('Retry',
-                  style: TextStyle(color: Colors.white)),
+              child:
+                  const Text('Retry', style: TextStyle(color: Colors.white)),
             ),
           ]),
         ),
       ),
-      data: (contest) => _ContestDetailBody(contest: contest, contestId: contestId),
+      data: (contest) =>
+          _ContestDetailBody(contest: contest, contestId: contestId),
     );
   }
 }
@@ -90,10 +123,14 @@ class _ContestDetailBody extends ConsumerStatefulWidget {
   ConsumerState<_ContestDetailBody> createState() => _ContestDetailBodyState();
 }
 
-class _ContestDetailBodyState extends ConsumerState<_ContestDetailBody> {
+class _ContestDetailBodyState extends ConsumerState<_ContestDetailBody>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _initSocket();
   }
 
@@ -103,7 +140,8 @@ class _ContestDetailBodyState extends ConsumerState<_ContestDetailBody> {
       final user = ref.read(authProvider).user;
       final teamId = widget.contest.myRegistration?.team?.id ?? 0;
       if (user != null) {
-        SocketService.joinContest(widget.contestId, teamId, user.id.toString());
+        SocketService.joinContest(
+            widget.contestId, teamId, user.id.toString());
       }
       SocketService.onLeaderboardUpdate((_) {
         ref.invalidate(contestLeaderboardProvider(widget.contestId));
@@ -117,69 +155,221 @@ class _ContestDetailBodyState extends ConsumerState<_ContestDetailBody> {
   void dispose() {
     final teamId = widget.contest.myRegistration?.team?.id ?? 0;
     SocketService.leaveContest(widget.contestId, teamId);
+    _tabController.dispose();
     super.dispose();
   }
 
+  bool get _isRegistered => widget.contest.myRegistration != null;
+
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 900;
     final contest = widget.contest;
     final contestId = widget.contestId;
 
     return Scaffold(
       backgroundColor: _kBg,
-      appBar: AppBar(
-        backgroundColor: _kSurface,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => context.canPop() ? context.pop() : context.go('/contests'),
-          icon: const Icon(Icons.arrow_back, color: _kTextPri),
-        ),
-        title: Text(contest.title,
-            style: const TextStyle(
-                color: _kTextPri, fontWeight: FontWeight.w700, fontSize: 17)),
-        actions: [
-          _AppBarTimer(contest: contest),
-          const SizedBox(width: 12),
-        ],
-      ),
-      body: isWide
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _LeftPanel(contest: contest, contestId: contestId),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: _RightPanel(contestId: contestId, contest: contest),
-                ),
-              ],
-            )
-          : SingleChildScrollView(
-              child: Column(children: [
-                _LeftPanel(contest: contest, contestId: contestId),
-                _RightPanel(contestId: contestId, contest: contest),
-              ]),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _ContestHeader(contest: contest),
+            // "Not registered" banner — only meaningful before/while contest runs
+            if (!_isRegistered && contest.status != 'ended')
+              _NotRegisteredBanner(
+                contest: contest,
+                onRegisterTap: contest.status == 'upcoming'
+                    ? () => _tabController.animateTo(0)
+                    : null,
+              ),
+            _ContestTabBar(controller: _tabController),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // ── Problems tab ──
+                  _ProblemsTab(
+                    contest: contest,
+                    contestId: contestId,
+                    isRegistered: _isRegistered,
+                  ),
+                  // ── Ranking tab ──
+                  _RankingTab(contest: contest, contestId: contestId),
+                ],
+              ),
             ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-// ─── _AppBarTimer ─────────────────────────────────────────────────────────────
+// ─── _ContestHeader ───────────────────────────────────────────────────────────
 
-class _AppBarTimer extends StatefulWidget {
-  const _AppBarTimer({required this.contest});
+class _ContestHeader extends StatelessWidget {
+  const _ContestHeader({required this.contest});
+  final ContestDetailModel contest;
+
+  void _share(BuildContext context) {
+    Clipboard.setData(
+        ClipboardData(text: 'Check out "${contest.title}" on CodeMania!'));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Contest link copied to clipboard'),
+      backgroundColor: _kPrimary,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _statusColor(contest.status);
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFE8C7), Color(0xFFFFD7A8), Color(0xFFFFE3D0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        children: [
+          // top bar: back + share
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => context.canPop()
+                      ? context.pop()
+                      : context.go('/contests'),
+                  icon: const Icon(Icons.arrow_back, color: _kTextPri),
+                ),
+                const Spacer(),
+                Material(
+                  color: Colors.white,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => _share(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(Icons.ios_share, color: _kTextPri, size: 20),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+          ),
+          // 3D cube emblem
+          const Padding(
+            padding: EdgeInsets.only(top: 4, bottom: 16),
+            child: _CubeEmblem(),
+          ),
+          // title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              contest.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: _kTextPri,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // date
+          Text(
+            _formatContestDate(contest.startTime),
+            style: const TextStyle(color: _kTextSec, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          // status dot
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration:
+                    BoxDecoration(color: statusColor, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _statusLabel(contest.status),
+                style: TextStyle(
+                    color: statusColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600),
+              ),
+              if (contest.status != 'ended') ...[
+                const SizedBox(width: 10),
+                _HeaderCountdown(contest: contest),
+              ],
+            ],
+          ),
+          const SizedBox(height: 18),
+        ],
+      ),
+    );
+  }
+}
+
+class _CubeEmblem extends StatelessWidget {
+  const _CubeEmblem();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 110,
+      height: 110,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withOpacity(0.9),
+            const Color(0xFFE8E2FF).withOpacity(0.9),
+            const Color(0xFFFFE0F0).withOpacity(0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withOpacity(0.6),
+            blurRadius: 24,
+            spreadRadius: 2,
+          ),
+          BoxShadow(
+            color: const Color(0xFFFFB37A).withOpacity(0.4),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.view_in_ar_rounded,
+          size: 60, color: _kPrimary),
+    );
+  }
+}
+
+// ─── _HeaderCountdown ─────────────────────────────────────────────────────────
+
+class _HeaderCountdown extends StatefulWidget {
+  const _HeaderCountdown({required this.contest});
   final ContestDetailModel contest;
 
   @override
-  State<_AppBarTimer> createState() => _AppBarTimerState();
+  State<_HeaderCountdown> createState() => _HeaderCountdownState();
 }
 
-class _AppBarTimerState extends State<_AppBarTimer> {
-  late Timer _t;
-  late Duration _rem;
+class _HeaderCountdownState extends State<_HeaderCountdown> {
+  Timer? _t;
+  Duration _rem = Duration.zero;
 
   @override
   void initState() {
@@ -200,75 +390,70 @@ class _AppBarTimerState extends State<_AppBarTimer> {
 
   @override
   void dispose() {
-    _t.cancel();
+    _t?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.contest.status == 'ended') {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 8),
-        child: Text('Ended',
-            style: TextStyle(color: _kTextSec, fontSize: 13)),
-      );
-    }
-    
-    if (_rem == Duration.zero) {
-      final text = widget.contest.status == 'live' ? 'Ending...' : 'Starting...';
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Text(text,
-            style: const TextStyle(color: _kPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
-      );
-    }
-    final h = _rem.inHours.toString().padLeft(2, '0');
+    if (_rem == Duration.zero) return const SizedBox.shrink();
+    final d = _rem.inDays;
+    final h = (_rem.inHours % 24).toString().padLeft(2, '0');
     final m = (_rem.inMinutes % 60).toString().padLeft(2, '0');
     final s = (_rem.inSeconds % 60).toString().padLeft(2, '0');
-    final label = widget.contest.status == 'live' ? 'Ends' : 'Starts';
-    final color = widget.contest.status == 'live' ? _kError : _kPrimary;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text('$label $h:$m:$s',
-          style: TextStyle(
-              color: color, fontWeight: FontWeight.w700, fontSize: 13)),
-    );
+    final time = d > 0 ? '${d}d $h:$m:$s' : '$h:$m:$s';
+    final label = widget.contest.status == 'live' ? 'ends in' : 'starts in';
+    return Text('· $label $time',
+        style: const TextStyle(color: _kTextSec, fontSize: 13));
   }
 }
 
-// ─── _LeftPanel ───────────────────────────────────────────────────────────────
+// ─── _NotRegisteredBanner ─────────────────────────────────────────────────────
 
-class _LeftPanel extends ConsumerWidget {
-  const _LeftPanel({required this.contest, required this.contestId});
+class _NotRegisteredBanner extends StatelessWidget {
+  const _NotRegisteredBanner({required this.contest, this.onRegisterTap});
   final ContestDetailModel contest;
-  final int contestId;
+  final VoidCallback? onRegisterTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final isUpcoming = contest.status == 'upcoming';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _kError.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kError.withOpacity(0.25)),
+      ),
+      child: Row(
         children: [
-          // Registration / team section
-          if (contest.status == 'upcoming') ...[
-            _RegistrationBanner(contest: contest, contestId: contestId),
-            const SizedBox(height: 16),
-          ],
-          // Pending invitations
-          if (contest.myTeamInvitations.isNotEmpty) ...[
-            _PendingInvitations(contest: contest, contestId: contestId),
-            const SizedBox(height: 16),
-          ],
-          // Problems list (live or ended)
-          if (contest.status == 'live' || contest.status == 'ended') ...[
-            _ProblemsList(contest: contest, contestId: contestId),
+          const Icon(Icons.info_outline, color: _kError, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              isUpcoming
+                  ? "You're not registered yet. Register before it starts to participate."
+                  : "You're not registered for this contest, so you can view problems but can't submit.",
+              style: const TextStyle(
+                  color: _kTextPri, fontSize: 13, height: 1.35),
+            ),
+          ),
+          if (isUpcoming && onRegisterTap != null) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onRegisterTap,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: _kError,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Register'),
+            ),
           ],
         ],
       ),
@@ -276,11 +461,213 @@ class _LeftPanel extends ConsumerWidget {
   }
 }
 
-// ─── _RegistrationBanner ──────────────────────────────────────────────────────
+// ─── _ContestTabBar ───────────────────────────────────────────────────────────
 
-class _RegistrationBanner extends ConsumerWidget {
-  const _RegistrationBanner(
-      {required this.contest, required this.contestId});
+class _ContestTabBar extends StatelessWidget {
+  const _ContestTabBar({required this.controller});
+  final TabController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: _kBg,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: TabBar(
+        controller: controller,
+        isScrollable: false,
+        indicator: BoxDecoration(
+          color: _kPrimary.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: _kPrimary,
+        unselectedLabelColor: _kTextSec,
+        labelStyle:
+            const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+        tabs: const [
+          Tab(text: 'Problems'),
+          Tab(text: 'Ranking'),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ProblemsTab
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProblemsTab extends ConsumerWidget {
+  const _ProblemsTab({
+    required this.contest,
+    required this.contestId,
+    required this.isRegistered,
+  });
+  final ContestDetailModel contest;
+  final int contestId;
+  final bool isRegistered;
+
+  Color _diffColor(String d) {
+    switch (d.toLowerCase()) {
+      case 'easy':
+        return _kEasy;
+      case 'hard':
+        return _kHard;
+      default:
+        return _kMedium;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Upcoming contest → show registration card (problems hidden until live).
+    if (contest.status == 'upcoming') {
+      return RefreshIndicator(
+        color: _kPrimary,
+        onRefresh: () =>
+            ref.read(contestDetailProvider(contestId).notifier).refresh(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _RegistrationCard(contest: contest, contestId: contestId),
+            if (contest.myTeamInvitations.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _PendingInvitations(contest: contest, contestId: contestId),
+            ],
+            const SizedBox(height: 24),
+            Center(
+              child: Column(
+                children: [
+                  Icon(Icons.lock_clock,
+                      size: 48, color: _kTextSec.withOpacity(0.4)),
+                  const SizedBox(height: 12),
+                  const Text('Problems unlock when the contest starts',
+                      style: TextStyle(color: _kTextSec, fontSize: 14)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Live or ended → show problem list.
+    final problems = contest.problems;
+    final canOpen = contest.status == 'live' || contest.status == 'ended';
+
+    return RefreshIndicator(
+      color: _kPrimary,
+      onRefresh: () =>
+          ref.read(contestDetailProvider(contestId).notifier).refresh(),
+      child: problems.isEmpty
+          ? ListView(
+              children: const [
+                SizedBox(height: 120),
+                Center(
+                  child: Text('No problems in this contest',
+                      style: TextStyle(color: _kTextSec)),
+                ),
+              ],
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: problems.length,
+              separatorBuilder: (_, __) => Divider(
+                  height: 1, color: _kTextSec.withOpacity(0.12), indent: 20, endIndent: 20),
+              itemBuilder: (context, i) {
+                final p = problems[i];
+                final solved = p.isSolvedByMe || p.isSolvedByTeam;
+                return InkWell(
+                  onTap: canOpen
+                      ? () {
+                          // Live + not registered → submission is blocked by
+                          // backend; warn early but still allow viewing.
+                          if (contest.status == 'live' && !isRegistered) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'You are not registered — you can view this problem but cannot submit.'),
+                                backgroundColor: _kError,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                          context.push(
+                              '/contests/$contestId/problems/${p.id}');
+                        }
+                      : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 18),
+                    child: Row(
+                      children: [
+                        Icon(
+                          solved
+                              ? Icons.check_circle
+                              : Icons.remove,
+                          color: solved ? _kAccepted : _kTextSec,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                p.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    color: _kTextPri,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                p.difficulty[0].toUpperCase() +
+                                    p.difficulty.substring(1).toLowerCase(),
+                                style: TextStyle(
+                                    color: _diffColor(p.difficulty),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // points pill (LeetCode shows score on the right)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _kBg,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${p.points}',
+                            style: const TextStyle(
+                                color: _kTextSec,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+// ─── _RegistrationCard ────────────────────────────────────────────────────────
+
+class _RegistrationCard extends ConsumerWidget {
+  const _RegistrationCard({required this.contest, required this.contestId});
   final ContestDetailModel contest;
   final int contestId;
 
@@ -321,8 +708,7 @@ class _RegistrationBanner extends ConsumerWidget {
 }
 
 class _RegistrationActions extends ConsumerStatefulWidget {
-  const _RegistrationActions(
-      {required this.contest, required this.contestId});
+  const _RegistrationActions({required this.contest, required this.contestId});
   final ContestDetailModel contest;
   final int contestId;
 
@@ -339,6 +725,7 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
       backgroundColor: isError ? _kError : _kPrimary,
+      behavior: SnackBarBehavior.floating,
     ));
   }
 
@@ -349,7 +736,6 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
         ref.read(contestDetailProvider(widget.contestId).notifier);
 
     if (reg == null) {
-      // Not registered
       if (widget.contest.contestType == 'solo') {
         return _WhiteButton(
           label: _loading ? 'Registering…' : 'Register Now',
@@ -368,7 +754,6 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
                 },
         );
       }
-      // Team — not registered
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -380,8 +765,7 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
           ),
           const SizedBox(height: 8),
           const Text('or accept an invitation below',
-              style: TextStyle(
-                  color: Colors.white70, fontSize: 13)),
+              style: TextStyle(color: Colors.white70, fontSize: 13)),
         ],
       );
     }
@@ -391,7 +775,7 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(children: [
-            Icon(Icons.check_circle, color: _kAccepted, size: 20),
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
             SizedBox(width: 8),
             Text('You are registered',
                 style: TextStyle(
@@ -421,7 +805,6 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
       );
     }
 
-    // Team registration
     final team = reg.team!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,8 +875,8 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: _kPrimary),
-            child: const Text('Create',
-                style: TextStyle(color: Colors.white)),
+            child:
+                const Text('Create', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -506,8 +889,8 @@ class _RegistrationActionsState extends ConsumerState<_RegistrationActions> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _InviteSheet(
-          notifier: notifier, contestId: widget.contestId),
+      builder: (_) =>
+          _InviteSheet(notifier: notifier, contestId: widget.contestId),
     );
   }
 }
@@ -525,14 +908,12 @@ class _WhiteButton extends StatelessWidget {
         backgroundColor: Colors.white,
         foregroundColor: _kPrimary,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10)),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       ),
       child: Text(label,
-          style: const TextStyle(
-              fontWeight: FontWeight.w700, fontSize: 14)),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
     );
   }
 }
@@ -610,8 +991,7 @@ class _InviteSheetState extends State<_InviteSheet> {
           onChanged: _search,
         ),
         const SizedBox(height: 8),
-        if (_searching)
-          const CircularProgressIndicator(color: _kPrimary),
+        if (_searching) const CircularProgressIndicator(color: _kPrimary),
         ..._results.map((u) => ListTile(
               leading: CircleAvatar(
                 backgroundColor: _kPrimary.withOpacity(0.15),
@@ -625,9 +1005,10 @@ class _InviteSheetState extends State<_InviteSheet> {
                   try {
                     await widget.notifier.inviteUser(u['id'] as int);
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('Invitation sent!'),
-                          backgroundColor: _kPrimary));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Invitation sent!'),
+                              backgroundColor: _kPrimary));
                       Navigator.pop(context);
                     }
                   } catch (e) {
@@ -654,8 +1035,7 @@ class _InviteSheetState extends State<_InviteSheet> {
 // ─── _PendingInvitations ──────────────────────────────────────────────────────
 
 class _PendingInvitations extends ConsumerWidget {
-  const _PendingInvitations(
-      {required this.contest, required this.contestId});
+  const _PendingInvitations({required this.contest, required this.contestId});
   final ContestDetailModel contest;
   final int contestId;
 
@@ -710,255 +1090,328 @@ class _PendingInvitations extends ConsumerWidget {
   }
 }
 
-// ─── _ProblemsList ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// _RankingTab
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _ProblemsList extends ConsumerWidget {
-  const _ProblemsList({required this.contest, required this.contestId});
+class _RankingTab extends ConsumerWidget {
+  const _RankingTab({required this.contest, required this.contestId});
   final ContestDetailModel contest;
   final int contestId;
 
-  Color _diffColor(String d) {
-    switch (d.toLowerCase()) {
-      case 'easy': return _kEasy;
-      case 'hard': return _kHard;
-      default: return _kMedium;
-    }
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _cardDeco(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final lbAsync = ref.watch(contestLeaderboardProvider(contestId));
+    final authUserId = ref.read(authProvider).user?.id;
+
+    return lbAsync.when(
+      loading: () =>
+          const Center(child: CircularProgressIndicator(color: _kPrimary)),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Error loading ranking',
+                style: TextStyle(color: _kTextSec)),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () =>
+                  ref.invalidate(contestLeaderboardProvider(contestId)),
+              style: ElevatedButton.styleFrom(backgroundColor: _kPrimary),
+              child:
+                  const Text('Retry', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+      data: (entries) {
+        if (entries.isEmpty) {
+          return RefreshIndicator(
+            color: _kPrimary,
+            onRefresh: () async =>
+                ref.invalidate(contestLeaderboardProvider(contestId)),
+            child: ListView(
+              children: [
+                const SizedBox(height: 120),
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.emoji_events_outlined,
+                          size: 48, color: _kTextSec.withOpacity(0.4)),
+                      const SizedBox(height: 12),
+                      Text(
+                        contest.status == 'upcoming'
+                            ? 'Ranking will appear once the contest begins'
+                            : 'No participants ranked yet',
+                        style: const TextStyle(color: _kTextSec),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final top3 = entries.take(3).toList();
+
+        return RefreshIndicator(
+          color: _kPrimary,
+          onRefresh: () async =>
+              ref.invalidate(contestLeaderboardProvider(contestId)),
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 24),
+            children: [
+              if (top3.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _Podium(top3: top3),
+                const SizedBox(height: 16),
+              ],
+              ...entries.asMap().entries.map((e) {
+                final rank = e.key + 1;
+                final lb = e.value;
+                final isMe = lb.userId != null && lb.userId == authUserId;
+                return _RankingRow(
+                  rank: rank,
+                  entry: lb,
+                  isCurrentUser: isMe,
+                  isTeam: contest.contestType == 'team',
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─── _Podium (top 3) ──────────────────────────────────────────────────────────
+
+class _Podium extends StatelessWidget {
+  const _Podium({required this.top3});
+  final List<LeaderboardEntryModel> top3;
+
+  @override
+  Widget build(BuildContext context) {
+    // Order: 2nd (left), 1st (center), 3rd (right)
+    final first = top3.isNotEmpty ? top3[0] : null;
+    final second = top3.length > 1 ? top3[1] : null;
+    final third = top3.length > 2 ? top3[2] : null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Text('Problems',
-              style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: _kTextPri)),
-          const SizedBox(height: 8),
-          ...contest.problems.map((p) {
-            final solved = p.isSolvedByMe || p.isSolvedByTeam;
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: solved
-                      ? _kAccepted.withOpacity(0.15)
-                      : const Color(0xFFF5F3FF),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  solved ? Icons.check : Icons.code,
-                  color: solved ? _kAccepted : _kPrimary,
-                  size: 18,
-                ),
-              ),
-              title: Text(p.title,
-                  style: const TextStyle(fontSize: 14, color: _kTextPri)),
-              subtitle: Text(p.difficulty,
-                  style: TextStyle(
-                      color: _diffColor(p.difficulty), fontSize: 12)),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('${p.points} pts',
-                      style: const TextStyle(
-                          color: _kPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
-                  if (p.isSolvedByTeam)
-                    const Text('team solved',
-                        style: TextStyle(color: _kAccepted, fontSize: 11))
-                  else if (p.isSolvedByMe)
-                    const Text('you solved',
-                        style: TextStyle(color: _kAccepted, fontSize: 11)),
-                ],
-              ),
-              onTap: contest.status == 'live'
-                  ? () => context.push('/contests/$contestId/problems/${p.id}')
-                  : null,
-            );
-          }),
+          Expanded(
+              child: second != null
+                  ? _PodiumItem(entry: second, rank: 2)
+                  : const SizedBox.shrink()),
+          Expanded(
+              child: first != null
+                  ? _PodiumItem(entry: first, rank: 1)
+                  : const SizedBox.shrink()),
+          Expanded(
+              child: third != null
+                  ? _PodiumItem(entry: third, rank: 3)
+                  : const SizedBox.shrink()),
         ],
       ),
     );
   }
 }
 
-// ─── _RightPanel — Leaderboard ────────────────────────────────────────────────
+class _PodiumItem extends StatelessWidget {
+  const _PodiumItem({required this.entry, required this.rank});
+  final LeaderboardEntryModel entry;
+  final int rank;
 
-class _RightPanel extends ConsumerWidget {
-  const _RightPanel({required this.contestId, required this.contest});
-  final int contestId;
-  final ContestDetailModel contest;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lbAsync = ref.watch(contestLeaderboardProvider(contestId));
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: _cardDeco(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              const Text('Leaderboard',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: _kTextPri)),
-              const Spacer(),
-              const Icon(Icons.emoji_events, color: _kPrimary, size: 20),
-            ]),
-            const SizedBox(height: 12),
-            lbAsync.when(
-              loading: () => const Center(
-                  child: CircularProgressIndicator(color: _kPrimary)),
-              error: (e, _) => Center(
-                  child: Text('Error loading leaderboard',
-                      style: const TextStyle(color: _kTextSec))),
-              data: (entries) {
-                if (entries.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(
-                        child: Text('No entries yet',
-                            style: TextStyle(color: _kTextSec))),
-                  );
-                }
-
-                final authUserId = ref.read(authProvider).user?.id;
-
-                return Column(
-                  children: entries.asMap().entries.map((entry) {
-                    final rank = entry.key + 1;
-                    final lb = entry.value;
-                    final isMe = lb.userId != null && lb.userId == authUserId;
-
-                    if (contest.contestType == 'team' && lb.members.isNotEmpty) {
-                      return ExpansionTile(
-                        leading: Text('#$rank',
-                            style: TextStyle(
-                                color: _rankColor(rank),
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14)),
-                        title: Text(lb.displayName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700, fontSize: 14)),
-                        trailing: Text('${lb.totalScore} pts',
-                            style: const TextStyle(
-                                color: _kPrimary,
-                                fontWeight: FontWeight.w700)),
-                        children: lb.members.map((m) => ListTile(
-                              dense: true,
-                              leading: CircleAvatar(
-                                radius: 14,
-                                backgroundColor:
-                                    _kPrimary.withOpacity(0.15),
-                                child: Text(m.username[0].toUpperCase(),
-                                    style: const TextStyle(
-                                        color: _kPrimary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12)),
-                              ),
-                              title: Text(m.username,
-                                  style: const TextStyle(fontSize: 13)),
-                              trailing: Text('${m.scoreContributed} pts',
-                                  style: const TextStyle(
-                                      color: _kTextSec, fontSize: 12)),
-                            )).toList(),
-                      );
-                    }
-
-                    return _LeaderboardRow(
-                        rank: rank, entry: lb, isCurrentUser: isMe);
-                  }).toList(),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+  Color get _ringColor {
+    switch (rank) {
+      case 1:
+        return const Color(0xFFFFD700);
+      case 2:
+        return const Color(0xFFC0C0C0);
+      default:
+        return const Color(0xFFCD7F32);
+    }
   }
 
-  Color _rankColor(int rank) {
-    if (rank == 1) return const Color(0xFFFFD700);
-    if (rank == 2) return const Color(0xFFC0C0C0);
-    if (rank == 3) return const Color(0xFFCD7F32);
-    return _kTextSec;
+  String _timeLabel() {
+    final t = entry.lastAcceptedAt;
+    if (t == null) return '${entry.totalScore} pts';
+    return DateFormat('HH:mm:ss').format(t.toLocal());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarRadius = rank == 1 ? 34.0 : 28.0;
+    return Column(
+      children: [
+        // rank number above
+        Text('$rank',
+            style: TextStyle(
+                color: _ringColor,
+                fontWeight: FontWeight.w800,
+                fontSize: rank == 1 ? 22 : 18)),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: _ringColor, width: 3),
+          ),
+          child: CircleAvatar(
+            radius: avatarRadius,
+            backgroundColor: _kPrimary.withOpacity(0.12),
+            backgroundImage: entry.avatarUrl != null
+                ? NetworkImage(entry.avatarUrl!)
+                : null,
+            child: entry.avatarUrl == null
+                ? Text(
+                    entry.displayName.isNotEmpty
+                        ? entry.displayName[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                        color: _kPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: rank == 1 ? 24 : 20))
+                : null,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            entry.displayName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                color: _kTextPri,
+                fontWeight: FontWeight.w600,
+                fontSize: 13),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(_timeLabel(),
+            style: const TextStyle(color: _kTextSec, fontSize: 12)),
+      ],
+    );
   }
 }
 
-class _LeaderboardRow extends StatelessWidget {
-  const _LeaderboardRow(
-      {required this.rank, required this.entry, required this.isCurrentUser});
+// ─── _RankingRow ──────────────────────────────────────────────────────────────
+
+class _RankingRow extends StatelessWidget {
+  const _RankingRow({
+    required this.rank,
+    required this.entry,
+    required this.isCurrentUser,
+    required this.isTeam,
+  });
   final int rank;
   final LeaderboardEntryModel entry;
   final bool isCurrentUser;
+  final bool isTeam;
 
-  Color _rankColor(int r) {
-    if (r == 1) return const Color(0xFFFFD700);
-    if (r == 2) return const Color(0xFFC0C0C0);
-    if (r == 3) return const Color(0xFFCD7F32);
-    return _kTextSec;
+  String _timeLabel() {
+    final t = entry.lastAcceptedAt;
+    if (t == null) return '${entry.problemsSolved} solved';
+    return DateFormat('HH:mm:ss').format(t.toLocal());
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: isCurrentUser
-            ? _kPrimary.withOpacity(0.08)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: isCurrentUser ? _kPrimary.withOpacity(0.08) : _kSurface,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(children: [
-        SizedBox(
-          width: 28,
-          child: Text('#$rank',
-              style: TextStyle(
-                  color: _rankColor(rank),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13)),
-        ),
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: _kPrimary.withOpacity(0.15),
-          backgroundImage:
-              entry.avatarUrl != null ? NetworkImage(entry.avatarUrl!) : null,
-          child: entry.avatarUrl == null
-              ? Text(entry.displayName[0].toUpperCase(),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text('$rank',
+                style: const TextStyle(
+                    color: _kTextPri,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15)),
+          ),
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: _kPrimary.withOpacity(0.12),
+            backgroundImage:
+                entry.avatarUrl != null ? NetworkImage(entry.avatarUrl!) : null,
+            child: entry.avatarUrl == null
+                ? Text(
+                    entry.displayName.isNotEmpty
+                        ? entry.displayName[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                        color: _kPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14))
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      color: _kPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13))
-              : null,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(entry.displayName,
-                style: const TextStyle(fontSize: 13, color: _kTextPri))),
-        Text('${entry.problemsSolved} solved',
-            style: const TextStyle(color: _kTextSec, fontSize: 12)),
-        const SizedBox(width: 12),
-        Text('${entry.totalScore} pts',
-            style: const TextStyle(
-                color: _kPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 13)),
-      ]),
+                      color: _kTextPri,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15),
+                ),
+                if (isTeam && entry.members.isNotEmpty)
+                  Text(
+                    entry.members.map((m) => m.username).join(', '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: _kTextSec, fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '${entry.totalScore} ',
+                      style: const TextStyle(
+                          color: _kPoints,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16),
+                    ),
+                    const TextSpan(
+                      text: 'pt',
+                      style: TextStyle(color: _kPoints, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(_timeLabel(),
+                  style: const TextStyle(color: _kTextSec, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right, color: _kTextSec, size: 18),
+        ],
+      ),
     );
   }
 }
