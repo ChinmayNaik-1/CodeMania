@@ -206,11 +206,20 @@ class _AppBarTimerState extends State<_AppBarTimer> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.contest.status == 'ended' || _rem == Duration.zero) {
+    if (widget.contest.status == 'ended') {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 8),
         child: Text('Ended',
             style: TextStyle(color: _kTextSec, fontSize: 13)),
+      );
+    }
+    
+    if (_rem == Duration.zero) {
+      final text = widget.contest.status == 'live' ? 'Ending...' : 'Starting...';
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text(text,
+            style: const TextStyle(color: _kPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
       );
     }
     final h = _rem.inHours.toString().padLeft(2, '0');

@@ -15,23 +15,25 @@ export async function checkAndUpdateContestStatus(contestId) {
   const { status, start_time, end_time } = result.rows[0];
   const now = new Date();
 
-  if (status === 'upcoming' && now >= new Date(start_time)) {
+  let currentStatus = status;
+
+  if (currentStatus === 'upcoming' && now >= new Date(start_time)) {
     await dbPool.query(
       `UPDATE contests SET status = 'live' WHERE id = $1 AND status = 'upcoming'`,
       [contestId]
     );
-    return 'live';
+    currentStatus = 'live';
   }
 
-  if (status === 'live' && now >= new Date(end_time)) {
+  if (currentStatus === 'live' && now >= new Date(end_time)) {
     await dbPool.query(
       `UPDATE contests SET status = 'ended' WHERE id = $1 AND status = 'live'`,
       [contestId]
     );
-    return 'ended';
+    currentStatus = 'ended';
   }
 
-  return status;
+  return currentStatus;
 }
 
 /**
