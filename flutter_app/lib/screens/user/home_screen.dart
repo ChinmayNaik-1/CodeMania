@@ -21,8 +21,8 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
   late int _selectedIndex;
+  String? _initialTopic;
 
   @override
   void initState() {
@@ -49,6 +49,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       const ContestsScreen(embedded: true),
       ProblemListScreen(
         embedded: true,
+        initialTopic: _initialTopic,
         onOpenProblem: _openProblem,
       ),
       user != null
@@ -130,7 +131,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _selectTab(int index) {
+  void _selectTab(int index, {String? topic}) {
     // Handle "You" tab (index 3) - check authentication
     if (index == 3) {
       final authState = ref.read(authProvider);
@@ -143,6 +144,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     setState(() {
       _selectedIndex = index;
+      if (topic != null) {
+        _initialTopic = topic;
+      }
     });
   }
 
@@ -161,7 +165,7 @@ class _LibraryPage extends ConsumerWidget {
 
   final ProblemState problemState;
   final void Function(ProblemModel problem) onOpenProblem;
-  final void Function(int index) onSelectTab;
+  final void Function(int index, {String? topic}) onSelectTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -324,31 +328,31 @@ class _LibraryPage extends ConsumerWidget {
                     label: 'Arrays',
                     icon: Icons.data_array,
                     color: const Color(0xFF6A3BDE),
-                    onTap: () => onSelectTab(2),
+                    onTap: () => onSelectTab(2, topic: 'Array'),
                   ),
                   _TopicChip(
                     label: 'Strings',
                     icon: Icons.text_fields,
                     color: const Color(0xFF24B88A),
-                    onTap: () => onSelectTab(2),
+                    onTap: () => onSelectTab(2, topic: 'String'),
                   ),
                   _TopicChip(
                     label: 'DP',
                     icon: Icons.account_tree_outlined,
                     color: const Color(0xFFF4A51B),
-                    onTap: () => onSelectTab(2),
+                    onTap: () => onSelectTab(2, topic: 'Dynamic Programming'),
                   ),
                   _TopicChip(
                     label: 'Graphs',
                     icon: Icons.hub_outlined,
                     color: const Color(0xFF28A0ED),
-                    onTap: () => onSelectTab(2),
+                    onTap: () => onSelectTab(2, topic: 'Graph'),
                   ),
                   _TopicChip(
                     label: 'Trees',
                     icon: Icons.park_outlined,
                     color: const Color(0xFFE5264A),
-                    onTap: () => onSelectTab(2),
+                    onTap: () => onSelectTab(2, topic: 'Tree'),
                   ),
                 ],
               ),

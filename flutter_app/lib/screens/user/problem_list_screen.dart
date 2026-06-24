@@ -9,10 +9,12 @@ class ProblemListScreen extends ConsumerStatefulWidget {
   const ProblemListScreen({
     super.key,
     this.embedded = false,
+    this.initialTopic,
     this.onOpenProblem,
   });
 
   final bool embedded;
+  final String? initialTopic;
   final ValueChanged<ProblemModel>? onOpenProblem;
 
   @override
@@ -28,9 +30,20 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTopic = widget.initialTopic;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(problemListProvider.notifier).fetchProblems();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant ProblemListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialTopic != oldWidget.initialTopic && widget.initialTopic != null) {
+      setState(() {
+        _selectedTopic = widget.initialTopic;
+      });
+    }
   }
 
   @override
