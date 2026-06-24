@@ -237,7 +237,7 @@ class _LibraryPage extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(24),
                   onTap: () {
                     if (user != null) {
-                      context.push('/profile/${user.id}');
+                      onSelectTab(3);
                     } else {
                       context.go('/login');
                     }
