@@ -68,24 +68,37 @@ async function runOnPiston(language, fullCode, stdin) {
     compile_timeout: 10000,
   };
 
-  try {
-    const response = await axios.post(PISTON_URL, payload, { 
-      timeout: 15000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
-      },
-      httpsAgent: new https.Agent({ rejectUnauthorized: false })
-    });
-    return response.data;
-  } catch (err) {
-    console.error('=== PISTON ERROR ===');
-    console.error('URL called:', PISTON_URL);
-    console.error('Payload sent:', JSON.stringify(payload, null, 2));
-    console.error('Status:', err.response?.status);
-    console.error('Response body:', JSON.stringify(err.response?.data, null, 2));
-    console.error('Message:', err.message);
-    throw err;
+  let retries = 3;
+  let delayMs = 1000;
+
+  while (retries > 0) {
+    try {
+      const response = await axios.post(PISTON_URL, payload, { 
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json'
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: false })
+      });
+      return response.data;
+    } catch (err) {
+      const status = err.response?.status;
+      if ((status === 404 || status === 429 || status === 502 || status === 503 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') && retries > 1) {
+        retries--;
+        await new Promise((res) => setTimeout(res, delayMs));
+        delayMs += 1000;
+        continue;
+      }
+
+      console.error('=== PISTON ERROR ===');
+      console.error('URL called:', PISTON_URL);
+      console.error('Payload sent:', JSON.stringify(payload, null, 2));
+      console.error('Status:', err.response?.status);
+      console.error('Response body:', JSON.stringify(err.response?.data, null, 2));
+      console.error('Message:', err.message);
+      throw err;
+    }
   }
 }
 
