@@ -652,12 +652,39 @@ router.put('/admin/:id/publish', requireAdmin, async (req, res) => {
 
 router.delete('/admin/:id', requireAdmin, async (req, res) => {
   const contestId = parseInt(req.params.id, 10);
-  const r = await dbPool.query(
-    `DELETE FROM contests WHERE id = $1 AND status IN ('draft', 'ended') RETURNING id`,
-    [contestId]
-  );
-  if (r.rows.length === 0) return res.status(400).json({ error: 'Contest not found or cannot be deleted (must be draft or ended)' });
-  res.json({ success: true });
+
+  try {
+    await dbPool.query('BEGIN');
+
+    const check = await dbPool.query(`SELECT status FROM contests WHERE id = $1`, [contestId]);
+    if (check.rows.length === 0) {
+      await dbPool.query('ROLLBACK');
+      return res.status(400).json({ error: 'Contest not found' });
+    }
+    const status = check.rows[0].status;
+    if (status !== 'draft' && status !== 'ended') {
+      await dbPool.query('ROLLBACK');
+      return res.status(400).json({ error: 'Contest cannot be deleted (must be draft or ended)' });
+    }
+
+    // Delete dependent records to prevent foreign key errors if cascade is missing
+    await dbPool.query(`DELETE FROM contest_submissions WHERE contest_id = $1`, [contestId]);
+    await dbPool.query(`DELETE FROM contest_problems WHERE contest_id = $1`, [contestId]);
+    await dbPool.query(`DELETE FROM contest_invitations WHERE contest_id = $1`, [contestId]);
+    await dbPool.query(`DELETE FROM contest_team_members WHERE team_id IN (SELECT id FROM contest_teams WHERE contest_id = $1)`, [contestId]);
+    await dbPool.query(`DELETE FROM contest_teams WHERE contest_id = $1`, [contestId]);
+    await dbPool.query(`DELETE FROM contest_registrations WHERE contest_id = $1`, [contestId]);
+
+    // Finally delete the contest
+    await dbPool.query(`DELETE FROM contests WHERE id = $1`, [contestId]);
+
+    await dbPool.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await dbPool.query('ROLLBACK');
+    console.error('Error deleting contest:', err);
+    res.status(500).json({ error: 'Failed to delete contest', detail: err.message });
+  }
 });
 
 router.get('/admin/:id/submissions', requireAdmin, async (req, res) => {
