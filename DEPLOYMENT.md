@@ -44,6 +44,15 @@
 
 ---
 
+## Troubleshooting
+
+### Codespaces & Piston Port Issues
+If you encounter a `502 Bad Gateway` from GitHub Codespaces or a `511 Network Authentication Required` error during code execution:
+- **Codespaces Proxy Glitches:** GitHub's internal proxy can freeze during heavy disk I/O, failing to route `.app.github.dev` to the Piston container. Fix this by stopping and restarting the forwarded port, or using `npx localtunnel --port 2001` to bypass GitHub entirely.
+- **Localtunnel Anti-Phishing Errors (511):** Localtunnel intercepts automated API requests with an HTML warning page. CodeMania's backend is natively configured to send the `Bypass-Tunnel-Reminder: true` HTTP header on all Piston API requests to silently bypass this security screen.
+
+---
+
 ## Deployment Architectures
 
 ### Option 1: Docker Compose (Small Production ~$100/month)
