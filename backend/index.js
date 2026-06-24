@@ -239,9 +239,13 @@ async function startServer() {
     const poolConnection = await dbPool.connect();
     poolConnection.release();
     console.log('✓ Database connected');
-
-    await initRedis();
-    console.log('✓ Redis connected');
+    try {
+      // Temporarily bypass Redis because Upstash monthly quota was exceeded, crashing the entire server.
+      // await initRedis();
+      console.log('✓ Redis initialization bypassed due to quota limits');
+    } catch (redisError) {
+      console.warn('⚠️  Redis failed to connect (likely quota exceeded). Leaderboards/presence may degrade gracefully:', redisError.message);
+    }
 
     await checkPistonHealth();
 
