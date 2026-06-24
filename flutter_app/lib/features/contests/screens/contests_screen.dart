@@ -206,18 +206,31 @@ class _ContestList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     
+    Widget content;
     if (contests.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.emoji_events_outlined,
-                size: 56, color: colorScheme.primary.withOpacity(0.3)),
-            const SizedBox(height: 12),
-            Text('No $type contests',
-                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 16)),
-          ],
+      content = SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.5,
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.emoji_events_outlined,
+                  size: 56, color: colorScheme.primary.withOpacity(0.3)),
+              const SizedBox(height: 12),
+              Text('No $type contests',
+                  style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 16)),
+            ],
+          ),
         ),
+      );
+    } else {
+      content = ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        itemCount: contests.length,
+        itemBuilder: (ctx, i) => _ContestCard(contest: contests[i], type: type),
       );
     }
 
@@ -226,11 +239,7 @@ class _ContestList extends ConsumerWidget {
       onRefresh: () async {
         ref.invalidate(contestListProvider);
       },
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-        itemCount: contests.length,
-        itemBuilder: (ctx, i) => _ContestCard(contest: contests[i], type: type),
-      ),
+      child: content,
     );
   }
 }

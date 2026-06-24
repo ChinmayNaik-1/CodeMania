@@ -122,19 +122,30 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
             color: colorScheme.primary,
             onRefresh: () => ref.read(problemListProvider.notifier).fetchProblems(),
             child: state.isLoading
-                ? Center(
-                    child: CircularProgressIndicator(color: colorScheme.primary),
+                ? SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Container(
+                      height: MediaQuery.of(context).size.height * 0.5,
+                      alignment: Alignment.center,
+                      child: CircularProgressIndicator(color: colorScheme.primary),
+                    ),
                   )
                 : filteredProblems.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No problems found',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurface.withOpacity(0.6),
+                    ? SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Container(
+                          height: MediaQuery.of(context).size.height * 0.5,
+                          alignment: Alignment.center,
+                          child: Text(
+                            'No problems found',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.6),
+                            ),
                           ),
                         ),
                       )
                     : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
                         itemCount: filteredProblems.length,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemBuilder: (context, index) {
