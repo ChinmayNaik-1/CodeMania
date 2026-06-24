@@ -200,7 +200,7 @@ function parsePistonMemoryLimit(value, fallbackBytes) {
   return parsed;
 }
 
-function normalizeOutput(output = '') {
+export function normalizeOutput(output = '') {
   return output
     .replace(/\r\n/g, '\n')
     .split('\n')
@@ -255,14 +255,6 @@ function toDisplayStatus(verdict = '') {
   }
 }
 
-export function normalizeOutput(output = '') {
-  return output
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .join('\n')
-    .trim();
-}
 
 export function normalizeCompare(output = '') {
   return String(output).replace(/\s+/g, '').toLowerCase();
