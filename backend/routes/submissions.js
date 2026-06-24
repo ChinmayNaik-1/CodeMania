@@ -233,7 +233,7 @@ router.post('/submit', authMiddleware, async (req, res) => {
       [problemId]
     );
 
-    const injectedCode = await injectDriverCode(problemId, language, code);
+    const injectedCode = await buildRunCode(problemId, language, code);
 
     let passed = 0;
     let failedCase = null;
