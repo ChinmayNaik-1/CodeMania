@@ -10,10 +10,24 @@ let redisClient = null;
 let redisReady = false;
 
 if (REDIS_ENABLED) {
+  let redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  
+  // Auto-fix Upstash URL scheme to enforce TLS (rediss:// instead of redis://)
+  if (redisUrl.includes('upstash.io') && redisUrl.startsWith('redis://')) {
+    redisUrl = redisUrl.replace('redis://', 'rediss://');
+    console.log('ℹ️ Auto-corrected Upstash URL to use secure TLS (rediss://)');
+  }
+
   redisClient = redis.createClient({
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    url: redisUrl,
+    pingInterval: 30000, // Keep connection alive
   });
-  redisClient.on('error', (err) => console.error('Redis error:', err));
+  
+  redisClient.on('error', (err) => {
+    // Suppress spammy Upstash idle socket drops from filling the logs
+    if (err?.message?.includes('Socket closed unexpectedly')) return;
+    console.error('Redis error:', err.message || err);
+  });
   redisClient.on('connect', () => console.log('Redis connected'));
 }
 
