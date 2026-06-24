@@ -397,8 +397,10 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
       }
     }
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -564,6 +566,39 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
               },
             )
           : null,
+        ),
+        if (problemState.isRunning || problemState.isSubmitting)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.7),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00B84C)),
+                        strokeWidth: 5,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      problemState.isRunning ? 'Running...' : 'Submitting...',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

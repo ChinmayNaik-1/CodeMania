@@ -225,12 +225,12 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _SettingsRow(
                     title: 'Notifications',
-                    onTap: () => context.push('/settings/dummy', extra: 'Notifications'),
+                    onTap: () => context.push('/settings/notifications'),
                   ),
                   Divider(height: 1, color: colorScheme.outline),
                   _SettingsRow(
                     title: 'Calendar Sync',
-                    onTap: () => context.push('/settings/dummy', extra: 'Calendar Sync'),
+                    onTap: () => context.push('/settings/calendar-sync'),
                   ),
                 ],
               ),
@@ -281,12 +281,12 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _SettingsRow(
                     title: 'Help Center',
-                    onTap: () => context.push('/settings/dummy', extra: 'Help Center'),
+                    onTap: () => context.push('/settings/help-center'),
                   ),
                   Divider(height: 1, color: colorScheme.outline),
                   _SettingsRow(
                     title: 'Feedback',
-                    onTap: () => context.push('/settings/dummy', extra: 'Feedback'),
+                    onTap: () => context.push('/settings/feedback'),
                   ),
                 ],
               ),
@@ -305,12 +305,12 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   _SettingsRow(
                     title: 'Terms',
-                    onTap: () => context.push('/settings/dummy', extra: 'Terms'),
+                    onTap: () => context.push('/settings/terms'),
                   ),
                   Divider(height: 1, color: colorScheme.outline),
                   _SettingsRow(
                     title: 'Privacy Policy',
-                    onTap: () => context.push('/settings/dummy', extra: 'Privacy Policy'),
+                    onTap: () => context.push('/settings/privacy-policy'),
                   ),
                 ],
               ),

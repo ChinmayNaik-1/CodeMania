@@ -21,6 +21,12 @@ import 'package:codemania/screens/settings/dummy_settings_page.dart';
 import 'package:codemania/screens/settings/edit_profile_screen.dart';
 import 'package:codemania/screens/settings/edit_name_screen.dart';
 import 'package:codemania/screens/settings/edit_codemania_id_screen.dart';
+import 'package:codemania/screens/settings/notifications_screen.dart';
+import 'package:codemania/screens/settings/calendar_sync_screen.dart';
+import 'package:codemania/screens/settings/privacy_policy_screen.dart';
+import 'package:codemania/screens/settings/terms_screen.dart';
+import 'package:codemania/screens/settings/help_center_screen.dart';
+import 'package:codemania/screens/settings/feedback_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -200,6 +206,36 @@ final routerProvider = Provider<GoRouter>((ref) {
           final title = state.extra as String? ?? 'Settings';
           return DummySettingsPage(title: title);
         },
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/calendar-sync',
+        name: 'calendarSync',
+        builder: (context, state) => const CalendarSyncScreen(),
+      ),
+      GoRoute(
+        path: '/settings/privacy-policy',
+        name: 'privacyPolicy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: '/settings/terms',
+        name: 'terms',
+        builder: (context, state) => const TermsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/help-center',
+        name: 'helpCenter',
+        builder: (context, state) => const HelpCenterScreen(),
+      ),
+      GoRoute(
+        path: '/settings/feedback',
+        name: 'feedback',
+        builder: (context, state) => const FeedbackScreen(),
       ),
     ],
     redirect: (context, routerState) {
