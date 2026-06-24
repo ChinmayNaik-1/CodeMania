@@ -653,10 +653,10 @@ router.put('/admin/:id/publish', requireAdmin, async (req, res) => {
 router.delete('/admin/:id', requireAdmin, async (req, res) => {
   const contestId = parseInt(req.params.id, 10);
   const r = await dbPool.query(
-    `DELETE FROM contests WHERE id = $1 AND status = 'draft' RETURNING id`,
+    `DELETE FROM contests WHERE id = $1 AND status IN ('draft', 'ended') RETURNING id`,
     [contestId]
   );
-  if (r.rows.length === 0) return res.status(400).json({ error: 'Contest not found or not in draft status' });
+  if (r.rows.length === 0) return res.status(400).json({ error: 'Contest not found or cannot be deleted (must be draft or ended)' });
   res.json({ success: true });
 });
 
