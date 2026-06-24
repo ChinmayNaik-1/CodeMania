@@ -172,30 +172,18 @@ function getSourceFileName(language = '') {
 
 function getRunTimeoutMs(language = '') {
   const envValue = parseInt(process.env.PISTON_RUN_TIMEOUT || '', 10);
-  if (!Number.isNaN(envValue) && envValue > 0) {
+  if (!Number.isNaN(envValue) && envValue > 0 && envValue <= 10000) {
     return envValue;
   }
-
-  const normalized = language.toLowerCase();
-  if (normalized === 'cpp' || normalized === 'c++') {
-    return 15000;
-  }
-
   return 10000;
 }
 
 function getCompileTimeoutMs(language = '') {
   const envValue = parseInt(process.env.PISTON_COMPILE_TIMEOUT || '', 10);
-  if (!Number.isNaN(envValue) && envValue > 0) {
+  if (!Number.isNaN(envValue) && envValue > 0 && envValue <= 10000) {
     return envValue;
   }
-
-  const normalized = language.toLowerCase();
-  if (normalized === 'cpp' || normalized === 'c++') {
-    return 30000;
-  }
-
-  return 20000;
+  return 10000;
 }
 
 function parsePistonMemoryLimit(value, fallbackBytes) {
