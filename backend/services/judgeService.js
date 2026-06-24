@@ -255,7 +255,26 @@ function toDisplayStatus(verdict = '') {
   }
 }
 
-function extractErrorLine(message = '') {
+export function normalizeOutput(output = '') {
+  return output
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .join('\n')
+    .trim();
+}
+
+export function normalizeCompare(output = '') {
+  return String(output).replace(/\s+/g, '').toLowerCase();
+}
+
+export function mapRunFailureStatus(run) {
+  if (run.run_status === 'TO') return 'Time Limit Exceeded';
+  if (run.code !== 0) return 'Runtime Error';
+  return 'Wrong Answer';
+}
+
+export function extractErrorLine(message = '') {
   if (!message) return null;
   const patterns = [
     /line\s+(\d+)/i,

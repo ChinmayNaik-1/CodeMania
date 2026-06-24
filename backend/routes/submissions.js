@@ -1,44 +1,18 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { dbPool } from '../index.js';
-import { buildExecutableCode, runAgainstTestCase } from '../services/judgeService.js';
+import {
+  buildExecutableCode,
+  runAgainstTestCase,
+  normalizeOutput,
+  normalizeCompare,
+  extractErrorLine,
+  mapRunFailureStatus
+} from '../services/judgeService.js';
 
 const router = Router();
 
-function normalizeOutput(output = '') {
-  return output
-    .replace(/\r\n/g, '\n')
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .join('\n')
-    .trim();
-}
-
-function normalizeCompare(output = '') {
-  return String(output).replace(/\s+/g, '').toLowerCase();
-}
-
-function extractErrorLine(message = '') {
-  if (!message) return null;
-  const patterns = [/line\s+(\d+)/i, /:(\d+):(\d+)/, /\((\d+)\)/];
-  for (const pattern of patterns) {
-    const match = String(message).match(pattern);
-    if (!match) continue;
-    const value = parseInt(match[1], 10);
-    if (!Number.isNaN(value)) return value;
-  }
-  return null;
-}
-
 async function buildRunCode(problemId, language, userCode) {
-  return buildExecutableCode(problemId, language, userCode, dbPool);
-}
-
-function mapRunFailureStatus(run) {
-  if (run.run_status === 'TO') return 'Time Limit Exceeded';
-  if (run.code !== 0) return 'Runtime Error';
-  return 'Wrong Answer';
-}
 
 router.post('/run', authMiddleware, async (req, res) => {
   try {
@@ -361,23 +335,36 @@ router.get('/problem/:problemId', authMiddleware, async (req, res) => {
     const offset = (page - 1) * limit;
 
     const result = await dbPool.query(
-      `SELECT id,
-              COALESCE(status,
-                CASE verdict
-                  WHEN 'accepted' THEN 'Accepted'
-                  WHEN 'wrong_answer' THEN 'Wrong Answer'
-                  WHEN 'compilation_error' THEN 'Compile Error'
-                  WHEN 'runtime_error' THEN 'Runtime Error'
-                  WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
-                  ELSE 'Pending'
-                END
-              ) AS status,
-              language,
-              COALESCE(runtime_ms, time_ms) AS runtime_ms,
-              memory_kb,
-              to_char((created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
-       FROM submissions
-       WHERE user_id = $1 AND problem_id = $2
+      `SELECT * FROM (
+         SELECT id,
+                COALESCE(status,
+                  CASE verdict
+                    WHEN 'accepted' THEN 'Accepted'
+                    WHEN 'wrong_answer' THEN 'Wrong Answer'
+                    WHEN 'compilation_error' THEN 'Compile Error'
+                    WHEN 'runtime_error' THEN 'Runtime Error'
+                    WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
+                    ELSE 'Pending'
+                  END
+                ) AS status,
+                language,
+                COALESCE(runtime_ms, time_ms) AS runtime_ms,
+                memory_kb,
+                to_char((created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+         FROM submissions
+         WHERE user_id = $1 AND problem_id = $2
+         
+         UNION ALL
+         
+         SELECT id,
+                verdict AS status,
+                language,
+                time_ms AS runtime_ms,
+                0 AS memory_kb,
+                to_char((submitted_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+         FROM contest_submissions
+         WHERE user_id = $1 AND problem_id = $2
+       ) all_subs
        ORDER BY created_at DESC
        LIMIT $3 OFFSET $4`,
       [req.user.id, problemId, limit, offset]

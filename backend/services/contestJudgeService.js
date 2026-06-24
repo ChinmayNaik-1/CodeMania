@@ -1,106 +1,13 @@
-import axios from 'axios';
-import https from 'https';
 import { dbPool } from '../index.js';
 import { getLeaderboard } from './contestService.js';
-
-const basePistonUrl = (process.env.PISTON_URL || 'http://localhost:2000')
-  .replace(/\/$/, '')
-  .replace(/\/api\/v2(\/execute|\/runtimes)?$/, '');
-const PISTON_URL = `${basePistonUrl}/api/v2/execute`;
-
-const LANGUAGE_MAP = {
-  'cpp':    { language: 'c++',    version: '*' },
-  'python': { language: 'python', version: '*' },
-  'java':   { language: 'java',   version: '*' },
-};
-
-async function buildExecutableCode(problemId, language, userCode) {
-  const result = await dbPool.query(
-    'SELECT driver_prefix, driver_suffix FROM driver_code WHERE problem_id = $1 AND language = $2',
-    [problemId, language]
-  );
-  
-  let prefix = '';
-  let suffix = '';
-  
-  if (result.rows.length > 0) {
-    prefix = result.rows[0].driver_prefix || '';
-    suffix = result.rows[0].driver_suffix || '';
-  }
-
-  if (!prefix && !suffix) {
-    if (language === 'c++' || language === 'cpp') {
-      const code = `#include<bits/stdc++.h>\nusing namespace std;\n${userCode}\nint main(){return 0;}`;
-      console.log('=== EXECUTABLE CODE SENT TO PISTON ===\n', code);
-      return code;
-    }
-    console.log('=== EXECUTABLE CODE SENT TO PISTON ===\n', userCode);
-    return userCode;
-  }
-  
-  const code = `${prefix}\n${userCode}\n${suffix}`;
-  console.log('=== EXECUTABLE CODE SENT TO PISTON ===\n', code);
-  return code;
-}
-
-function normalizeLang(lang) {
-  const map = {
-    'cpp': 'c++',
-    'c++': 'c++',
-    'C++': 'c++',
-    'python': 'python',
-    'python3': 'python',
-    'java': 'java',
-    'javascript': 'javascript',
-    'js': 'javascript',
-  };
-  return map[lang] ?? lang.toLowerCase();
-}
-
-async function runOnPiston(language, fullCode, stdin) {
-  const normLang = normalizeLang(language);
-  const payload = {
-    language: normLang,
-    version: '*',
-    files: [{ name: normLang === 'c++' ? 'main.cpp' : 'main', content: fullCode }],
-    stdin: stdin || '',
-    run_timeout: 3000,
-    compile_timeout: 10000,
-  };
-
-  let retries = 3;
-  let delayMs = 1000;
-
-  while (retries > 0) {
-    try {
-      const response = await axios.post(PISTON_URL, payload, { 
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'application/json'
-        },
-        httpsAgent: new https.Agent({ rejectUnauthorized: false })
-      });
-      return response.data;
-    } catch (err) {
-      const status = err.response?.status;
-      if ((status === 404 || status === 429 || status === 502 || status === 503 || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') && retries > 1) {
-        retries--;
-        await new Promise((res) => setTimeout(res, delayMs));
-        delayMs += 1000;
-        continue;
-      }
-
-      console.error('=== PISTON ERROR ===');
-      console.error('URL called:', PISTON_URL);
-      console.error('Payload sent:', JSON.stringify(payload, null, 2));
-      console.error('Status:', err.response?.status);
-      console.error('Response body:', JSON.stringify(err.response?.data, null, 2));
-      console.error('Message:', err.message);
-      throw err;
-    }
-  }
-}
+import {
+  buildExecutableCode,
+  runAgainstTestCase,
+  normalizeOutput,
+  normalizeCompare,
+  extractErrorLine,
+  mapRunFailureStatus
+} from './judgeService.js';
 
 export async function judgeContestSubmission(
   contestId, problemId, userId, teamId, language, userCode, io
@@ -118,13 +25,15 @@ export async function judgeContestSubmission(
     teamName = teamResult.rows[0]?.name || null;
   }
 
-  const fullCode = await buildExecutableCode(problemId, language, userCode);
-
-  const tcResult = await dbPool.query(
-    'SELECT input, expected_output FROM test_cases WHERE problem_id = $1',
+  const allCases = await dbPool.query(
+    `SELECT id, input, expected_output, COALESCE(is_hidden, false) AS is_hidden
+     FROM test_cases
+     WHERE problem_id = $1
+     ORDER BY is_hidden ASC, id ASC`,
     [problemId]
   );
-  const testCases = tcResult.rows;
+
+  const testCases = allCases.rows;
 
   if (testCases.length === 0) {
     await dbPool.query(`
@@ -139,46 +48,69 @@ export async function judgeContestSubmission(
     return { verdict: 'No test cases', scoreAwarded: 0, firstSolve: false };
   }
 
-  let verdict = 'Accepted';
-  let firstFailStdout = null;
-  let firstFailStderr = null;
+  const fullCode = await buildExecutableCode(problemId, language, userCode, dbPool);
+
+  let passed = 0;
+  let failedCase = null;
+  let failureStatus = null;
+  let errorMessage = null;
+  let errorLine = null;
+  let runtimeMs = 0;
+  let memoryKb = 0;
+  let actualOutput = '';
   let compileOutput = null;
-  let totalTimeMs = 0;
 
   for (const tc of testCases) {
-    const result = await runOnPiston(language, fullCode, tc.input);
-    
-    if (result.compile && result.compile.code !== 0) {
-      verdict = 'Compile Error';
-      compileOutput = result.compile.output;
+    const run = await runAgainstTestCase(fullCode, language, '*', tc.input);
+
+    const compileFailed =
+      (run.compile_code !== undefined && run.compile_code !== null && run.compile_code !== 0) ||
+      (run.compile_status && run.compile_status !== 'OK');
+
+    if (compileFailed) {
+      failureStatus = 'Compile Error';
+      compileOutput = run.compile_stderr || run.compile_stdout || run.compile_message || 'Compilation failed';
+      errorMessage = compileOutput;
+      errorLine = extractErrorLine(errorMessage);
       break;
     }
-    
-    if (result.run.code !== 0 || result.run.signal) {
-      if (result.run.signal === 'SIGKILL') {
-        verdict = 'Time Limit Exceeded';
-      } else {
-        verdict = 'Runtime Error';
-        firstFailStderr = result.run.stderr;
-      }
+
+    if (run.code !== 0 || run.run_status === 'TO') {
+      failureStatus = mapRunFailureStatus(run);
+      errorMessage = run.stderr || run.run_message || 'Runtime error';
+      errorLine = extractErrorLine(errorMessage);
+      actualOutput = normalizeOutput(run.stdout || '');
+      runtimeMs = Math.max(runtimeMs, Number(run.time_ms || 0));
+      memoryKb = Math.max(memoryKb, Number(run.memory_kb || 0));
       break;
     }
-    
-    const actual = (result.run.stdout || '').trim();
-    const expected = (tc.expected_output || '').trim();
-    totalTimeMs += parseInt(result.run.time || 0, 10);
-    
-    if (actual !== expected) {
-      verdict = 'Wrong Answer';
-      firstFailStdout = result.run.stdout;
+
+    const actual = normalizeOutput(run.stdout || '');
+    const expected = normalizeOutput(tc.expected_output || '');
+    actualOutput = actual;
+    runtimeMs = Math.max(runtimeMs, Number(run.time_ms || 0));
+    memoryKb = Math.max(memoryKb, Number(run.memory_kb || 0));
+
+    if (normalizeCompare(actual) === normalizeCompare(expected)) {
+      passed += 1;
+    } else {
+      failedCase = {
+        ...tc,
+        actual,
+        expected_output: tc.expected_output,
+      };
+      failureStatus = 'Wrong Answer';
       break;
     }
   }
 
+  const total = testCases.length;
+  const status = failureStatus || (passed === total ? 'Accepted' : 'Wrong Answer');
+
   let scoreAwarded = 0;
   let firstSolve = false;
 
-  if (verdict === 'Accepted') {
+  if (status === 'Accepted') {
     const solveKey = teamId
       ? 'WHERE contest_id=$1 AND problem_id=$2 AND team_id=$3'
       : 'WHERE contest_id=$1 AND problem_id=$2 AND user_id=$3 AND team_id IS NULL';
@@ -246,22 +178,25 @@ export async function judgeContestSubmission(
     [contestId, problemId, userId, user.username,
      teamId || null, teamName,
      language, userCode,
-     verdict,
-     firstFailStdout,
-     firstFailStderr,
+     status,
+     status === 'Wrong Answer' ? actualOutput : null,
+     errorMessage,
      compileOutput,
-     totalTimeMs,
+     runtimeMs,
      scoreAwarded,
      firstSolve]
   );
 
-  const submissionId = insertResult.rows[0].id;
-
-  return { verdict, scoreAwarded, firstSolve, submissionId };
+  return { 
+    verdict: status, 
+    scoreAwarded, 
+    firstSolve, 
+    submissionId: insertResult.rows[0].id 
+  };
 }
 
 export async function runContestSample(problemId, language, userCode) {
-  const fullCode = await buildExecutableCode(problemId, language, userCode);
+  const fullCode = await buildExecutableCode(problemId, language, userCode, dbPool);
   const tcResult = await dbPool.query(
     'SELECT input, expected_output FROM test_cases WHERE problem_id=$1 AND is_hidden=false',
     [problemId]
@@ -270,31 +205,50 @@ export async function runContestSample(problemId, language, userCode) {
   
   const results = [];
   for (const tc of testCases) {
-    const result = await runOnPiston(language, fullCode, tc.input);
-    const compileOutput = result.compile?.output || '';
-    const stdout = result.run?.stdout?.trim() || '';
-    const stderr = result.run?.stderr || '';
-    const expected = (tc.expected_output || '').trim();
-    
-    let verdict = 'Accepted';
-    if (result.compile && result.compile.code !== 0) {
-      verdict = 'Compile Error';
-    } else if (result.run?.signal === 'SIGKILL') {
-      verdict = 'Time Limit Exceeded';
-    } else if (result.run?.code !== 0 || result.run?.signal) {
-      verdict = 'Runtime Error';
-    } else if (stdout !== expected) {
-      verdict = 'Wrong Answer';
+    const run = await runAgainstTestCase(fullCode, language, '*', tc.input);
+    const compileFailed =
+      (run.compile_code !== undefined && run.compile_code !== null && run.compile_code !== 0) ||
+      (run.compile_status && run.compile_status !== 'OK');
+
+    if (compileFailed) {
+      results.push({
+        input: tc.input,
+        expected_output: tc.expected_output,
+        actual_output: '',
+        stderr: '',
+        compile_output: run.compile_stderr || run.compile_stdout || run.compile_message || 'Compilation failed',
+        passed: false,
+        verdict: 'Compile Error'
+      });
+      continue;
     }
 
+    if (run.code !== 0 || run.run_status === 'TO') {
+      const failureStatus = mapRunFailureStatus(run);
+      results.push({
+        input: tc.input,
+        expected_output: tc.expected_output,
+        actual_output: normalizeOutput(run.stdout || ''),
+        stderr: run.stderr || run.run_message || 'Runtime error',
+        compile_output: '',
+        passed: false,
+        verdict: failureStatus
+      });
+      continue;
+    }
+
+    const actual = normalizeOutput(run.stdout || '');
+    const expected = normalizeOutput(tc.expected_output || '');
+    const passed = normalizeCompare(actual) === normalizeCompare(expected);
+    
     results.push({
       input: tc.input,
       expected_output: tc.expected_output,
-      actual_output: stdout,
-      stderr: stderr,
-      compile_output: compileOutput,
-      passed: stdout === expected,
-      verdict: verdict
+      actual_output: actual,
+      stderr: '',
+      compile_output: '',
+      passed: passed,
+      verdict: passed ? 'Accepted' : 'Wrong Answer'
     });
   }
   return results;
