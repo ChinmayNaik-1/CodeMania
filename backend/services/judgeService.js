@@ -172,10 +172,10 @@ function getSourceFileName(language = '') {
 
 function getRunTimeoutMs(language = '') {
   const envValue = parseInt(process.env.PISTON_RUN_TIMEOUT || '', 10);
-  if (!Number.isNaN(envValue) && envValue > 0 && envValue <= 10000) {
+  if (!Number.isNaN(envValue) && envValue > 0 && envValue <= 3000) {
     return envValue;
   }
-  return 10000;
+  return 3000;
 }
 
 function getCompileTimeoutMs(language = '') {
