@@ -483,6 +483,9 @@ export async function judgeSubmission(code, language, version, problemId, dbPool
     let failedCase = null;
 
     for (const testCase of testCases) {
+      // Temporary fix: delay between test cases to avoid Piston API rate limits/404 drops
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      
       try {
         const result = await runAgainstTestCase(executableCode, language, version, testCase.input);
 
