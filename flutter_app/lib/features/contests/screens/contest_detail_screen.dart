@@ -167,7 +167,7 @@ class _ContestDetailBodyState extends ConsumerState<_ContestDetailBody>
     final contestId = widget.contestId;
 
     return Scaffold(
-      backgroundColor: _kBg,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -223,15 +223,32 @@ class _ContestHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusColor = _statusColor(contest.status);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    final onSurface = isDark ? Colors.white : _kTextPri;
+    final onSurfaceSec = isDark ? Colors.white70 : _kTextSec;
+    final iconBg = isDark ? colorScheme.surface.withOpacity(0.5) : Colors.white;
 
-    return Container(
-      decoration: const BoxDecoration(
+    BoxDecoration decoration;
+    if (contest.status == 'ended') {
+      decoration = BoxDecoration(
+        color: isDark ? colorScheme.surfaceVariant.withOpacity(0.4) : const Color(0xFFF0F0F0),
+      );
+    } else {
+      decoration = BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFFFE8C7), Color(0xFFFFD7A8), Color(0xFFFFE3D0)],
+          colors: isDark 
+              ? [const Color(0xFF2C2440), const Color(0xFF382B4A), const Color(0xFF2F2445)]
+              : [const Color(0xFFFFE8C7), const Color(0xFFFFD7A8), const Color(0xFFFFE3D0)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-      ),
+      );
+    }
+
+    return Container(
+      decoration: decoration,
       child: Column(
         children: [
           // top bar: back + share
@@ -243,18 +260,18 @@ class _ContestHeader extends StatelessWidget {
                   onPressed: () => context.canPop()
                       ? context.pop()
                       : context.go('/contests'),
-                  icon: const Icon(Icons.arrow_back, color: _kTextPri),
+                  icon: Icon(Icons.arrow_back, color: onSurface),
                 ),
                 const Spacer(),
                 Material(
-                  color: Colors.white,
+                  color: iconBg,
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: () => _share(context),
-                    child: const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: Icon(Icons.ios_share, color: _kTextPri, size: 20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Icon(Icons.ios_share, color: onSurface, size: 20),
                     ),
                   ),
                 ),
@@ -273,8 +290,8 @@ class _ContestHeader extends StatelessWidget {
             child: Text(
               contest.title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: _kTextPri,
+              style: TextStyle(
+                color: onSurface,
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
                 height: 1.1,
@@ -285,7 +302,7 @@ class _ContestHeader extends StatelessWidget {
           // date
           Text(
             _formatContestDate(contest.startTime),
-            style: const TextStyle(color: _kTextSec, fontSize: 14),
+            style: TextStyle(color: onSurfaceSec, fontSize: 14),
           ),
           const SizedBox(height: 8),
           // status dot
@@ -403,8 +420,10 @@ class _HeaderCountdownState extends State<_HeaderCountdown> {
     final s = (_rem.inSeconds % 60).toString().padLeft(2, '0');
     final time = d > 0 ? '${d}d $h:$m:$s' : '$h:$m:$s';
     final label = widget.contest.status == 'live' ? 'ends in' : 'starts in';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white70 : _kTextSec;
     return Text('· $label $time',
-        style: const TextStyle(color: _kTextSec, fontSize: 13));
+        style: TextStyle(color: textColor, fontSize: 13));
   }
 }
 
@@ -470,7 +489,7 @@ class _ContestTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _kBg,
+      color: Theme.of(context).scaffoldBackgroundColor,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: TabBar(
         controller: controller,
