@@ -22,16 +22,10 @@ class AdminContestsScreen extends ConsumerWidget {
     final asyncContests = ref.watch(adminContestsFutureProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F3FF),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text('Manage Contests', style: TextStyle(color: Color(0xFF1A1A2E), fontWeight: FontWeight.bold)),
-        iconTheme: const IconThemeData(color: Color(0xFF1A1A2E)),
-        elevation: 0,
-      ),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/admin/contests/create'),
-        backgroundColor: const Color(0xFF6C5CE7),
+        backgroundColor: Theme.of(context).colorScheme.primary,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Create Contest', style: TextStyle(color: Colors.white)),
       ),

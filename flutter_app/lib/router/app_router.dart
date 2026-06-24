@@ -1,3 +1,4 @@
+import 'package:codemania/screens/admin/admin_scaffold.dart';
 import 'package:codemania/screens/admin/admin_dashboard.dart';
 import 'package:codemania/features/admin/screens/admin_contests_screen.dart';
 import 'package:codemania/features/admin/screens/create_contest_screen.dart';
@@ -51,11 +52,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'googleSignupComplete',
         builder: (context, state) => const GoogleSignupCompletionScreen(),
       ),
-      GoRoute(
-        path: '/admin',
-        name: 'adminDashboard',
-        builder: (context, state) => const AdminDashboard(),
+      // Admin Shell Route
+      ShellRoute(
+        builder: (context, state, child) => AdminScaffold(child: child),
+        routes: [
+          GoRoute(
+            path: '/admin',
+            name: 'adminDashboard',
+            builder: (context, state) => const AdminDashboard(),
+          ),
+          GoRoute(
+            path: '/admin/problems/manage',
+            name: 'manageProblems',
+            builder: (context, state) => const ManageProblemsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/contests',
+            name: 'adminContests',
+            builder: (context, state) => const AdminContestsScreen(),
+          ),
+        ],
       ),
+      // Admin Full-Screen Routes (Create/Edit)
       GoRoute(
         path: '/admin/problems/create',
         name: 'createProblem',
@@ -69,11 +87,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CreateProblemScreen(editingProblemId: id);
         },
       ),
-      GoRoute(
-        path: '/admin/problems/manage',
-        name: 'manageProblems',
-        builder: (context, state) => const ManageProblemsScreen(),
-      ),
+      // Removed manageProblems route because it's now in the ShellRoute
+
       GoRoute(
         path: '/admin/contests/create',
         name: 'createContest',
@@ -87,11 +102,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CreateContestScreen(contestId: id);
         },
       ),
-      GoRoute(
-        path: '/admin/contests',
-        name: 'adminContests',
-        builder: (context, state) => const AdminContestsScreen(),
-      ),
+      // Removed adminContests route because it's now in the ShellRoute
+
       GoRoute(
         path: '/home',
         name: 'home',

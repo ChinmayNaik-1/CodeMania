@@ -342,12 +342,22 @@ class _CreateProblemScreenState extends ConsumerState<CreateProblemScreen>
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/admin/problems/manage');
+            }
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isSaving || state.isLoading || !_isInit ? null : _onSave,
-        backgroundColor: const Color(0xFF2CBB5D),
-        icon: const Icon(Icons.save),
-        label: const Text('Save Problem'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        icon: const Icon(Icons.save, color: Colors.white),
+        label: const Text('Save Problem', style: TextStyle(color: Colors.white)),
       ),
       body: state.isLoading || !_isInit
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF6C3CE1)))

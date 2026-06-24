@@ -45,27 +45,21 @@ class _ManageProblemsScreenState extends ConsumerState<ManageProblemsScreen> {
     final state = ref.watch(problemListProvider);
 
     if (state.isLoading && state.problems.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Manage Problems')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (state.error != null && state.problems.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Manage Problems')),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(state.error!),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: _refreshProblems,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(state.error!),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _refreshProblems,
+              child: const Text('Retry'),
+            ),
+          ],
         ),
       );
     }
@@ -79,52 +73,46 @@ class _ManageProblemsScreenState extends ConsumerState<ManageProblemsScreen> {
     final normalProblems = filteredProblems.where((p) => !p.isContestExclusive).toList();
     final exclusiveProblems = filteredProblems.where((p) => p.isContestExclusive).toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Problems'),
-      ),
-      body: DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: TextField(
-                controller: _searchCtrl,
-                decoration: InputDecoration(
-                  hintText: 'Search by name or number...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Search by name or number...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
             ),
-            TabBar(
-              labelColor: const Color(0xFF6C5CE7),
-              unselectedLabelColor: const Color(0xFF6B7280),
-              indicatorColor: const Color(0xFF6C5CE7),
-              tabs: [
-                Tab(text: "Normal  (${normalProblems.length})"),
-                Tab(text: "Contest Exclusive  (${exclusiveProblems.length})"),
+          ),
+          TabBar(
+            labelColor: Theme.of(context).colorScheme.primary,
+            indicatorColor: Theme.of(context).colorScheme.primary,
+            tabs: [
+              Tab(text: "Normal  (${normalProblems.length})"),
+              Tab(text: "Contest Exclusive  (${exclusiveProblems.length})"),
+            ],
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _ProblemList(
+                  problems: normalProblems,
+                  onRefresh: _refreshProblems,
+                ),
+                _ProblemList(
+                  problems: exclusiveProblems,
+                  onRefresh: _refreshProblems,
+                ),
               ],
             ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _ProblemList(
-                    problems: normalProblems,
-                    onRefresh: _refreshProblems,
-                  ),
-                  _ProblemList(
-                    problems: exclusiveProblems,
-                    onRefresh: _refreshProblems,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -205,14 +193,14 @@ class _ProblemList extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF6C5CE7).withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
                 child: Text(
                   "${p.problemNumber ?? p.id}",
-                  style: const TextStyle(
-                    color: Color(0xFF6C5CE7),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
                   ),
@@ -244,13 +232,13 @@ class _ProblemList extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6C5CE7).withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
+                    child: Text(
                       "Contest Only",
                       style: TextStyle(
-                        color: Color(0xFF6C5CE7),
+                        color: Theme.of(context).colorScheme.primary,
                         fontSize: 12,
                       ),
                     ),
