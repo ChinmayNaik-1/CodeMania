@@ -223,7 +223,9 @@ class _ContestList extends StatelessWidget {
 
     return RefreshIndicator(
       color: colorScheme.primary,
-      onRefresh: () async {},
+      onRefresh: () async {
+        ref.invalidate(contestListProvider);
+      },
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         itemCount: contests.length,
@@ -235,17 +237,20 @@ class _ContestList extends StatelessWidget {
 
 // ─── _ContestCard ─────────────────────────────────────────────────────────────
 
-class _ContestCard extends StatelessWidget {
+class _ContestCard extends ConsumerWidget {
   const _ContestCard({required this.contest, required this.type});
   final ContestModel contest;
   final String type;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     
     return GestureDetector(
-      onTap: () => context.push('/contests/${contest.id}'),
+      onTap: () async {
+        await context.push('/contests/${contest.id}');
+        ref.invalidate(contestListProvider);
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(18),
@@ -400,13 +405,13 @@ class _CountdownTimerState extends State<_CountdownTimer> {
 
 // ─── _ActionButton ────────────────────────────────────────────────────────────
 
-class _ActionButton extends StatelessWidget {
+class _ActionButton extends ConsumerWidget {
   const _ActionButton({required this.contest, required this.type});
   final ContestModel contest;
   final String type;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     String label;
     if (type == 'live') label = 'Enter Contest';
     else if (type == 'ended') label = 'View Results';
@@ -417,7 +422,10 @@ class _ActionButton extends StatelessWidget {
 
     if (isOutlined) {
       return OutlinedButton(
-        onPressed: () => context.push('/contests/${contest.id}'),
+        onPressed: () async {
+          await context.push('/contests/${contest.id}');
+          ref.invalidate(contestListProvider);
+        },
         style: OutlinedButton.styleFrom(
           foregroundColor: _kPrimary,
           side: const BorderSide(color: _kPrimary),
@@ -429,7 +437,10 @@ class _ActionButton extends StatelessWidget {
     }
 
     return ElevatedButton(
-      onPressed: () => context.push('/contests/${contest.id}'),
+      onPressed: () async {
+        await context.push('/contests/${contest.id}');
+        ref.invalidate(contestListProvider);
+      },
       style: ElevatedButton.styleFrom(
         backgroundColor: type == 'live' ? _kAccepted : _kPrimary,
         foregroundColor: Colors.white,

@@ -156,8 +156,14 @@ class _LibraryPage extends ConsumerWidget {
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+    return RefreshIndicator(
+      color: colorScheme.primary,
+      onRefresh: () async {
+        ref.read(problemListProvider.notifier).fetchProblems();
+        ref.invalidate(contestListProvider);
+      },
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -288,7 +294,7 @@ class _LibraryPage extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 
   String _formatTime(DateTime? dateTime) {

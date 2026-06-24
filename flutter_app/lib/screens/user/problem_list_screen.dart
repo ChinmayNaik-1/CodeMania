@@ -118,30 +118,34 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
 
         // Problem list
         Expanded(
-          child: state.isLoading
-              ? Center(
-                  child: CircularProgressIndicator(color: colorScheme.primary),
-                )
-              : filteredProblems.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No problems found',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurface.withOpacity(0.6),
+          child: RefreshIndicator(
+            color: colorScheme.primary,
+            onRefresh: () => ref.read(problemListProvider.notifier).fetchProblems(),
+            child: state.isLoading
+                ? Center(
+                    child: CircularProgressIndicator(color: colorScheme.primary),
+                  )
+                : filteredProblems.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No problems found',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.6),
+                          ),
                         ),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredProblems.length,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemBuilder: (context, index) {
+                          final problem = filteredProblems[index];
+                          return _ProblemListItem(
+                            problem: problem,
+                            onTap: () => _openProblem(problem),
+                          );
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      itemCount: filteredProblems.length,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemBuilder: (context, index) {
-                        final problem = filteredProblems[index];
-                        return _ProblemListItem(
-                          problem: problem,
-                          onTap: () => _openProblem(problem),
-                        );
-                      },
-                    ),
+          ),
         ),
       ],
     );
