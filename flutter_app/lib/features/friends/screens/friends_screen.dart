@@ -157,16 +157,6 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
     // Wrap with sidebar on wide screens
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      drawer: isCompact
-          ? Drawer(
-              child: SafeArea(
-                child: SizedBox(
-                  width: 220,
-                  child: const AppSidebar(activePage: 'friends'),
-                ),
-              ),
-            )
-          : null,
       body: SafeArea(
         child: Row(
           children: [
@@ -179,11 +169,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
               child: Column(
                 children: [
                   // Top bar matching home_screen
-                  _FriendsTopBar(
-                    onMenuTap: isCompact
-                        ? () => Scaffold.of(context).openDrawer()
-                        : null,
-                  ),
+                  const _FriendsTopBar(),
                   Expanded(child: body),
                 ],
               ),
@@ -216,13 +202,6 @@ class _FriendsTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (onMenuTap != null) ...[
-            IconButton(
-              onPressed: onMenuTap,
-              icon: Icon(Icons.menu, color: colorScheme.onSurface),
-            ),
-            const SizedBox(width: 4),
-          ],
           Text(
             'Friends',
             style: TextStyle(
@@ -320,19 +299,24 @@ class _FriendCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(friend.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
                 const SizedBox(height: 3),
-                Row(children: [
-                  Icon(Icons.check_circle_outline, size: 13, color: _kGreen),
-                  const SizedBox(width: 4),
-                  Text('${friend.solvedCount} solved',
-                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
-                  const SizedBox(width: 12),
-                  const Text('🔥', style: TextStyle(fontSize: 12)),
-                  Text(' ${friend.currentStreak}d streak',
-                      style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
-                ]),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 13, color: _kGreen),
+                    const SizedBox(width: 4),
+                    Text('${friend.solvedCount} solved',
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
+                    const SizedBox(width: 12),
+                    const Text('🔥', style: TextStyle(fontSize: 12)),
+                    Text(' ${friend.currentStreak}d streak',
+                        style: TextStyle(color: colorScheme.onSurface.withOpacity(0.6), fontSize: 12)),
+                  ],
+                ),
               ],
             ),
           ),
