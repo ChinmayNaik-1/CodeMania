@@ -52,13 +52,53 @@ class _SubmissionHeatmapViewState extends State<_SubmissionHeatmapView> {
   HeatmapEntry? _hovered;
   Offset _tooltipPos = Offset.zero;
 
-  Color _cellColor(int count, int maxCount) {
-    if (count == 0) return const Color(0xFFEBEDF0); // white/light grey empty
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Color _getPaletteColor(int index, bool isDark) {
+    if (isDark) {
+      const colors = [
+        Color(0xFF2D333B),
+        Color(0xFF0E4429),
+        Color(0xFF006D32),
+        Color(0xFF26A641),
+        Color(0xFF39D353),
+      ];
+      return colors[index];
+    } else {
+      const colors = [
+        Color(0xFFEBEDF0),
+        Color(0xFFC6E48B),
+        Color(0xFF7BC96F),
+        Color(0xFF239A3B),
+        Color(0xFF196127),
+      ];
+      return colors[index];
+    }
+  }
+
+  Color _cellColor(int count, int maxCount, bool isDark) {
+    if (count == 0) return _getPaletteColor(0, isDark);
     final ratio = count / maxCount;
-    if (ratio < 0.25) return const Color(0xFFC6E48B); // light green
-    if (ratio < 0.50) return const Color(0xFF7BC96F); // medium green
-    if (ratio < 0.75) return const Color(0xFF239A3B); // dark green
-    return const Color(0xFF196127);                   // darkest green
+    if (ratio <= 0.25) return _getPaletteColor(1, isDark);
+    if (ratio <= 0.50) return _getPaletteColor(2, isDark);
+    if (ratio <= 0.75) return _getPaletteColor(3, isDark);
+    return _getPaletteColor(4, isDark);
   }
 
   static const _monthNames = [
@@ -103,6 +143,7 @@ class _SubmissionHeatmapViewState extends State<_SubmissionHeatmapView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final maxCount = widget.data.heatmap.values.isEmpty
         ? 0
         : widget.data.heatmap.values.reduce(math.max);
@@ -149,6 +190,7 @@ class _SubmissionHeatmapViewState extends State<_SubmissionHeatmapView> {
 
         // Scrollable horizontal heatmap
         SingleChildScrollView(
+          controller: _scrollController,
           scrollDirection: Axis.horizontal,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,11 +261,11 @@ class _SubmissionHeatmapViewState extends State<_SubmissionHeatmapView> {
                                 width: cellSize,
                                 height: cellSize,
                                 decoration: BoxDecoration(
-                                  color: _cellColor(count, maxCount),
+                                  color: _cellColor(count, maxCount, isDark),
                                   borderRadius: BorderRadius.circular(2),
                                   border: isToday
                                       ? Border.all(
-                                          color: const Color(0xFF216E39),
+                                          color: isDark ? const Color(0xFF39D353) : const Color(0xFF216E39),
                                           width: 1.5)
                                       : null,
                                 ),
@@ -274,20 +316,14 @@ class _SubmissionHeatmapViewState extends State<_SubmissionHeatmapView> {
             const Text('Less',
                 style: TextStyle(color: Color(0xFF666680), fontSize: 10)),
             const SizedBox(width: 4),
-            for (final color in const [
-              Color(0xFF2D333B),
-              Color(0xFF0E4429),
-              Color(0xFF006D32),
-              Color(0xFF26A641),
-              Color(0xFF39D353),
-            ])
+            for (var i = 0; i < 5; i++)
               Padding(
                 padding: const EdgeInsets.only(right: 3),
                 child: Container(
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
-                    color: color,
+                    color: _getPaletteColor(i, isDark),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
