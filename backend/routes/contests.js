@@ -667,15 +667,10 @@ router.delete('/admin/:id', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Contest cannot be deleted (must be draft or ended)' });
     }
 
-    // Delete dependent records to prevent foreign key errors if cascade is missing
+    // Delete dependent records that lack ON DELETE CASCADE
     await dbPool.query(`DELETE FROM contest_submissions WHERE contest_id = $1`, [contestId]);
-    await dbPool.query(`DELETE FROM contest_problems WHERE contest_id = $1`, [contestId]);
-    await dbPool.query(`DELETE FROM contest_invitations WHERE contest_id = $1`, [contestId]);
-    await dbPool.query(`DELETE FROM contest_team_members WHERE team_id IN (SELECT id FROM contest_teams WHERE contest_id = $1)`, [contestId]);
-    await dbPool.query(`DELETE FROM contest_teams WHERE contest_id = $1`, [contestId]);
-    await dbPool.query(`DELETE FROM contest_registrations WHERE contest_id = $1`, [contestId]);
 
-    // Finally delete the contest
+    // Delete the contest (Postgres will cascade delete registrations, teams, problems, leaderboard, etc.)
     await dbPool.query(`DELETE FROM contests WHERE id = $1`, [contestId]);
 
     await dbPool.query('COMMIT');
