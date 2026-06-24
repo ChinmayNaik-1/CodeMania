@@ -108,7 +108,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () {
-                        context.push('/admin/problems/manage');
+                        context.go('/admin/problems/manage');
                       },
                       icon: const Icon(Icons.edit_note_outlined),
                       label: const Text('Manage/Edit Problems'),
@@ -123,7 +123,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> {
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () {
-                        context.push('/admin/contests');
+                        context.go('/admin/contests');
                       },
                       icon: const Icon(Icons.event),
                       label: const Text('Manage Contests'),
