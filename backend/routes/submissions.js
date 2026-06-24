@@ -13,6 +13,8 @@ import {
 const router = Router();
 
 async function buildRunCode(problemId, language, userCode) {
+  return buildExecutableCode(problemId, language, userCode, dbPool);
+}
 
 router.post('/run', authMiddleware, async (req, res) => {
   try {
