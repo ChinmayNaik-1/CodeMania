@@ -596,7 +596,9 @@ class _ProblemsTab extends ConsumerWidget {
                             );
                           }
                           context.push(
-                              '/contests/$contestId/problems/${p.id}');
+                              '/contests/$contestId/problems/${p.id}').then((_) {
+                            ref.invalidate(contestDetailProvider(contestId));
+                          });
                         }
                       : null,
                   child: Padding(

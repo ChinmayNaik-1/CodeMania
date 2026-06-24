@@ -114,10 +114,11 @@ class _GoogleSignupCompletionScreenState
             ],
           ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(
@@ -272,6 +273,7 @@ class _GoogleSignupCompletionScreenState
               ),
             ),
           ),
+        ),
         ),
       ),
     );

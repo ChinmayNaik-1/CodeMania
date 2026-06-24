@@ -493,34 +493,36 @@ class _ProblemPageState extends ConsumerState<ProblemPage>
 
     if (state.error != null) {
       return Scaffold(
-        backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFFFFFFF),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                state.error!,
-                style: TextStyle(
-                  color: isDark ? const Color(0xFFEBEBEB) : const Color(0xFF262626),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  state.error!,
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFFEBEBEB) : const Color(0xFF262626),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () {
-                    ref
-                      .read(problemProvider(widget.problemId).notifier)
-                      .fetchProblem(widget.problemId);
-                },
-                child: const Text('Retry'),
-              ),
-            ],
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: () {
+                      ref
+                        .read(problemProvider(widget.problemId).notifier)
+                        .fetchProblem(widget.problemId);
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
     
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFFFFFFF),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {

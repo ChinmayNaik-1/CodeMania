@@ -37,16 +37,17 @@ class _TestcasePanelState extends ConsumerState<TestcasePanel> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
 
     return Column(
       children: [
         Container(
           height: 40,
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF7F7F7),
+            color: theme.scaffoldBackgroundColor,
             border: Border(
               bottom: BorderSide(
-                color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
+                color: theme.dividerColor,
               ),
             ),
           ),

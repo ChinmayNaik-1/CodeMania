@@ -11,15 +11,9 @@ import 'services/runtime_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Enable edge-to-edge display with proper system UI styling
+  // Edge-to-edge: the OS bars are transparent and each screen paints its own
+  // solid theme background behind them (icon brightness is set per-theme below).
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarDividerColor: Colors.transparent,
-    ),
-  );
   
   usePathUrlStrategy();
   ApiService.init();
@@ -42,6 +36,26 @@ class CodeManiaApp extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       routerConfig: router,
+      builder: (context, child) {
+        // Resolve the effective brightness (handles ThemeMode.system too) and
+        // drive the transparent system bars' icon brightness to match, so the
+        // status bar / nav bar always read clearly against the theme background.
+        final brightness = Theme.of(context).brightness;
+        final isDark = brightness == Brightness.dark;
+        final overlay = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarIconBrightness:
+              isDark ? Brightness.light : Brightness.dark,
+        );
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlay,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

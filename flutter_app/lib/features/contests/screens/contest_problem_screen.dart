@@ -206,9 +206,11 @@ class _ContestProblemScreenState extends ConsumerState<ContestProblemScreen> {
 
     if (state.error != null) {
       return Scaffold(
-        backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFFFFFFF),
-        body: Center(
-          child: Text(state.error!, style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Center(
+            child: Text(state.error!, style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+          ),
         ),
       );
     }
@@ -219,7 +221,7 @@ class _ContestProblemScreenState extends ConsumerState<ContestProblemScreen> {
     }
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFFFFFFF),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {

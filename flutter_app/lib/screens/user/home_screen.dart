@@ -55,7 +55,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       extendBody: false,
-      body: pages[_selectedIndex],
+      // SafeArea keeps embedded pages below the status bar. Bottom is handled by
+      // the bottomNavigationBar (which already pads the system gesture inset).
+      body: SafeArea(
+        bottom: false,
+        child: pages[_selectedIndex],
+      ),
       bottomNavigationBar: Container(
         height: 64 + MediaQuery.of(context).padding.bottom,
         padding: EdgeInsets.only(
