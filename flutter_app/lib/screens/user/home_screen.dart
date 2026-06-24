@@ -21,6 +21,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   late int _selectedIndex;
   String? _initialTopic;
 
