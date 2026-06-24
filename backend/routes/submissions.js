@@ -432,7 +432,41 @@ router.get('/:id', authMiddleware, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Submission not found', code: 'NOT_FOUND' });
+      const contestResult = await dbPool.query(
+        `SELECT id,
+                COALESCE(
+                  CASE verdict
+                    WHEN 'accepted' THEN 'Accepted'
+                    WHEN 'wrong_answer' THEN 'Wrong Answer'
+                    WHEN 'compilation_error' THEN 'Compile Error'
+                    WHEN 'runtime_error' THEN 'Runtime Error'
+                    WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
+                    ELSE verdict
+                  END
+                ) AS status,
+                language,
+                time_ms AS runtime_ms,
+                memory_kb,
+                0 AS passed_cases,
+                0 AS total_cases,
+                to_char((submitted_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+                code,
+                compile_output AS error_message,
+                stderr,
+                NULL::int AS error_line,
+                NULL::text AS input,
+                NULL::text AS expected_output,
+                NULL::text AS your_output
+         FROM contest_submissions
+         WHERE id = $1 AND user_id = $2`,
+        [submissionId, req.user.id]
+      );
+
+      if (contestResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Submission not found', code: 'NOT_FOUND' });
+      }
+
+      return res.json({ submission: contestResult.rows[0] });
     }
 
     return res.json({ submission: result.rows[0] });
@@ -454,12 +488,19 @@ router.get('/heatmap', authMiddleware, async (req, res) => {
 
     const result = await dbPool.query(
       `SELECT
-         DATE(created_at AT TIME ZONE 'UTC') AS date,
-         COUNT(*) AS count
-       FROM submissions
-       WHERE user_id = $1
-         AND created_at >= NOW() - INTERVAL '1 year'
-       GROUP BY DATE(created_at AT TIME ZONE 'UTC')
+         date, SUM(count) as count
+       FROM (
+         SELECT DATE(created_at AT TIME ZONE 'UTC') AS date, COUNT(*) AS count
+         FROM submissions
+         WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '1 year'
+         GROUP BY DATE(created_at AT TIME ZONE 'UTC')
+         UNION ALL
+         SELECT DATE(submitted_at AT TIME ZONE 'UTC') AS date, COUNT(*) AS count
+         FROM contest_submissions
+         WHERE user_id = $1 AND submitted_at >= NOW() - INTERVAL '1 year'
+         GROUP BY DATE(submitted_at AT TIME ZONE 'UTC')
+       ) AS all_subs
+       GROUP BY date
        ORDER BY date ASC`,
       [userId]
     );

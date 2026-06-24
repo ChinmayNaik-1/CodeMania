@@ -441,6 +441,7 @@ router.post('/:id/problems/:problemId/submit', async (req, res) => {
     );
 
     res.json({
+      submission_id: result.submissionId,
       verdict: result.verdict,
       score_awarded: result.scoreAwarded,
       first_solve: result.firstSolve,

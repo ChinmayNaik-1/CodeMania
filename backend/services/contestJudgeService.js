@@ -222,13 +222,14 @@ export async function judgeContestSubmission(
     }
   }
 
-  await dbPool.query(`
+  const insertResult = await dbPool.query(`
     INSERT INTO contest_submissions
       (contest_id, problem_id, user_id, username,
        team_id, team_name, language, code,
        verdict, stdout, stderr, compile_output,
        time_ms, score_awarded, first_solve)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+    RETURNING id`,
     [contestId, problemId, userId, user.username,
      teamId || null, teamName,
      language, userCode,
@@ -241,7 +242,9 @@ export async function judgeContestSubmission(
      firstSolve]
   );
 
-  return { verdict, scoreAwarded, firstSolve };
+  const submissionId = insertResult.rows[0].id;
+
+  return { verdict, scoreAwarded, firstSolve, submissionId };
 }
 
 export async function runContestSample(problemId, language, userCode) {
