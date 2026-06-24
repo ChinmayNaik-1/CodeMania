@@ -66,7 +66,7 @@ class SubmissionDetailFullScreen extends ConsumerWidget {
         data: (submission) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
           
-          final verdict = (submission['verdict'] as String?) ?? 'Unknown';
+          final verdict = (submission['status'] as String?) ?? (submission['verdict'] as String?) ?? 'Unknown';
           final problemTitle = (submission['problemTitle'] ?? submission['problem_title'] as String?) ?? 'Problem';
           final passedCases = submission['passedCases'] ?? submission['passed_cases'];
           final totalCases = submission['totalCases'] ?? submission['total_cases'];
