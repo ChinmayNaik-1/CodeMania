@@ -41,7 +41,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     final pages = [
-      _LibraryPage(problemState: problemState),
+      _LibraryPage(
+        problemState: problemState,
+        onOpenProblem: _openProblem,
+        onSelectTab: _selectTab,
+      ),
       const ContestsScreen(embedded: true),
       ProblemListScreen(
         embedded: true,
@@ -149,17 +153,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _LibraryPage extends ConsumerWidget {
-  const _LibraryPage({required this.problemState});
+  const _LibraryPage({
+    required this.problemState,
+    required this.onOpenProblem,
+    required this.onSelectTab,
+  });
 
   final ProblemState problemState;
+  final void Function(ProblemModel problem) onOpenProblem;
+  final void Function(int index) onSelectTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final contestsAsync = ref.watch(contestListProvider);
-    final submissionsAsync = AsyncValue.data([]);
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final problems = problemState.problems;
+    final easyCount =
+        problems.where((p) => p.difficulty.toLowerCase() == 'easy').length;
+    final medCount =
+        problems.where((p) => p.difficulty.toLowerCase() == 'medium').length;
+    final hardCount =
+        problems.where((p) => p.difficulty.toLowerCase() == 'hard').length;
+    final solvedCount = problems.where((p) => p.isSolved == true).length;
+    final totalCount = problems.length;
+    final progress = totalCount == 0 ? 0.0 : solvedCount / totalCount;
+
+    // A deterministic "daily" problem so it stays stable through the day.
+    final ProblemModel? daily = problems.isEmpty
+        ? null
+        : problems[DateTime.now().day % problems.length];
+
+    // Trending = first few problems (backend returns ordered list).
+    final trending = problems.take(5).toList();
 
     return RefreshIndicator(
       color: colorScheme.primary,
@@ -169,147 +199,735 @@ class _LibraryPage extends ConsumerWidget {
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Library',
-            style: textTheme.displayMedium,
-          ),
-          const SizedBox(height: 16),
-          // Banner card
-          InkWell(
-            onTap: () => context.go('/contests'),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [colorScheme.primary, Color(0xFFFF8C00)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Active Contests',
-                      style: textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Greeting header ──
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _greeting(),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withOpacity(0.6),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 2),
+                      Text(
+                        user != null ? user.username : 'Welcome, Coder',
+                        style: textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  Icon(Icons.emoji_events, color: Colors.white, size: 32),
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () {
+                    if (user != null) {
+                      context.push('/profile/${user.id}');
+                    } else {
+                      context.go('/login');
+                    }
+                  },
+                  child: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: colorScheme.primary.withOpacity(0.15),
+                    backgroundImage: user?.avatarUrl != null
+                        ? NetworkImage(user!.avatarUrl!)
+                        : null,
+                    child: user?.avatarUrl == null
+                        ? Text(
+                            user != null && user.username.isNotEmpty
+                                ? user.username[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // ── Daily challenge hero ──
+            _DailyChallengeCard(
+              problem: daily,
+              onTap: daily == null ? null : () => onOpenProblem(daily),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Stats strip ──
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    icon: Icons.check_circle_outline,
+                    label: 'Solved',
+                    value: '$solvedCount',
+                    color: AppTheme.getDifficultyColor('easy', isDark),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StatTile(
+                    icon: Icons.bolt_outlined,
+                    label: 'Total',
+                    value: '$totalCount',
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StatTile(
+                    icon: Icons.military_tech_outlined,
+                    label: 'Rating',
+                    value: user != null ? '${user.rating}' : '—',
+                    color: const Color(0xFF28A0ED),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // ── Progress card ──
+            _ProgressCard(
+              solved: solvedCount,
+              total: totalCount,
+              progress: progress,
+            ),
+            const SizedBox(height: 24),
+
+            // ── Topics ──
+            Text('Topics', style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            )),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 96,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  _TopicChip(
+                    label: 'Arrays',
+                    icon: Icons.data_array,
+                    color: const Color(0xFF6A3BDE),
+                    onTap: () => onSelectTab(2),
+                  ),
+                  _TopicChip(
+                    label: 'Strings',
+                    icon: Icons.text_fields,
+                    color: const Color(0xFF24B88A),
+                    onTap: () => onSelectTab(2),
+                  ),
+                  _TopicChip(
+                    label: 'DP',
+                    icon: Icons.account_tree_outlined,
+                    color: const Color(0xFFF4A51B),
+                    onTap: () => onSelectTab(2),
+                  ),
+                  _TopicChip(
+                    label: 'Graphs',
+                    icon: Icons.hub_outlined,
+                    color: const Color(0xFF28A0ED),
+                    onTap: () => onSelectTab(2),
+                  ),
+                  _TopicChip(
+                    label: 'Trees',
+                    icon: Icons.park_outlined,
+                    color: const Color(0xFFE5264A),
+                    onTap: () => onSelectTab(2),
+                  ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          // Problems section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Problems', style: textTheme.headlineSmall),
-              InkWell(
-                onTap: () => context.go('/problems'),
-                child: Icon(Icons.arrow_forward, color: colorScheme.onSurface.withOpacity(0.6)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _DifficultyCard(
-                  label: 'Easy',
-                  count: problemState.problems.where((p) => p.difficulty.toLowerCase() == 'easy').length,
-                  color: AppTheme.getDifficultyColor('easy', isDark),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _DifficultyCard(
-                  label: 'Medium',
-                  count: problemState.problems.where((p) => p.difficulty.toLowerCase() == 'medium').length,
-                  color: AppTheme.getDifficultyColor('medium', isDark),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _DifficultyCard(
-                  label: 'Hard',
-                  count: problemState.problems.where((p) => p.difficulty.toLowerCase() == 'hard').length,
-                  color: AppTheme.getDifficultyColor('hard', isDark),
-                ),
-              ),
-            ],
-          ),
+            const SizedBox(height: 24),
 
-          const SizedBox(height: 24),
-          // Contests
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Contests', style: textTheme.headlineSmall),
-              Icon(Icons.arrow_forward, color: colorScheme.onSurface.withOpacity(0.6)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          contestsAsync.when(
-            data: (contestsList) {
-              final upcoming = [...?contestsList['upcoming']].take(2).toList();
-              if (upcoming.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
+            // ── Difficulty breakdown ──
+            Text('By Difficulty', style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            )),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _DifficultyCard(
+                    label: 'Easy',
+                    count: easyCount,
+                    color: AppTheme.getDifficultyColor('easy', isDark),
+                    onTap: () => onSelectTab(2),
                   ),
-                  child: Center(
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DifficultyCard(
+                    label: 'Medium',
+                    count: medCount,
+                    color: AppTheme.getDifficultyColor('medium', isDark),
+                    onTap: () => onSelectTab(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DifficultyCard(
+                    label: 'Hard',
+                    count: hardCount,
+                    color: AppTheme.getDifficultyColor('hard', isDark),
+                    onTap: () => onSelectTab(2),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // ── Trending problems ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Trending Problems', style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                )),
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => onSelectTab(2),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
                     child: Text(
-                      'No upcoming contests',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.6),
+                      'See all',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                );
-              }
-              return Column(
-                children: upcoming.map((contest) => _ContestCard(contest: contest)).toList(),
-              );
-            },
-            loading: () => CircularProgressIndicator(color: colorScheme.primary),
-            error: (e, s) => Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'No contests available',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.6),
                 ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (problemState.isLoading && trending.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                    child: CircularProgressIndicator(color: colorScheme.primary)),
+              )
+            else if (trending.isEmpty)
+              _EmptyHint(text: 'No problems available yet')
+            else
+              ...trending.asMap().entries.map((e) => _TrendingProblemTile(
+                    index: e.key + 1,
+                    problem: e.value,
+                    onTap: () => onOpenProblem(e.value),
+                  )),
+            const SizedBox(height: 24),
+
+            // ── Contests ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Contests', style: textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                )),
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => onSelectTab(1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Text(
+                      'See all',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            contestsAsync.when(
+              data: (contestsList) {
+                final upcoming = [
+                  ...?contestsList['live'],
+                  ...?contestsList['upcoming'],
+                ].take(3).toList();
+                if (upcoming.isEmpty) {
+                  return _EmptyHint(text: 'No upcoming contests');
+                }
+                return Column(
+                  children: upcoming
+                      .map((contest) => _ContestCard(
+                            contest: contest,
+                            onTap: () => context.push('/contests/${contest.id}'),
+                          ))
+                      .toList(),
+                );
+              },
+              loading: () => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                    child: CircularProgressIndicator(color: colorScheme.primary)),
               ),
+              error: (e, s) => _EmptyHint(text: 'No contests available'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning 👋';
+    if (hour < 17) return 'Good afternoon 👋';
+    return 'Good evening 👋';
+  }
+}
+
+// ─── _DailyChallengeCard ──────────────────────────────────────────────────────
+
+class _DailyChallengeCard extends StatelessWidget {
+  const _DailyChallengeCard({required this.problem, this.onTap});
+
+  final ProblemModel? problem;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [colorScheme.primary, const Color(0xFFFF8C00)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.3),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.local_fire_department,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 6),
+                Text(
+                  'DAILY CHALLENGE',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              problem?.title ?? 'Loading today\'s problem…',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              problem != null
+                  ? problem!.difficulty
+                  : 'Come back daily to keep your streak',
+              style: textTheme.bodySmall?.copyWith(
+                color: Colors.white.withOpacity(0.85),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Solve now',
+                    style: textTheme.labelLarge?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.arrow_forward,
+                      size: 18, color: colorScheme.primary),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── _StatTile ────────────────────────────────────────────────────────────────
+
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
         ],
       ),
-    ));
+    );
   }
+}
 
-  String _formatTime(DateTime? dateTime) {
-    if (dateTime == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+// ─── _ProgressCard ────────────────────────────────────────────────────────────
+
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard({
+    required this.solved,
+    required this.total,
+    required this.progress,
+  });
+
+  final int solved;
+  final int total;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final pct = (progress * 100).round();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 52,
+            height: 52,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 52,
+                  height: 52,
+                  child: CircularProgressIndicator(
+                    value: progress.clamp(0.0, 1.0),
+                    strokeWidth: 6,
+                    backgroundColor: colorScheme.outline.withOpacity(0.3),
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(colorScheme.secondary),
+                  ),
+                ),
+                Text(
+                  '$pct%',
+                  style: textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Progress',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  total == 0
+                      ? 'Start solving to track progress'
+                      : '$solved of $total problems solved',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── _TopicChip ───────────────────────────────────────────────────────────────
+
+class _TopicChip extends StatelessWidget {
+  const _TopicChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          width: 84,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── _TrendingProblemTile ─────────────────────────────────────────────────────
+
+class _TrendingProblemTile extends StatelessWidget {
+  const _TrendingProblemTile({
+    required this.index,
+    required this.problem,
+    required this.onTap,
+  });
+
+  final int index;
+  final ProblemModel problem;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final diffColor = AppTheme.getDifficultyColor(problem.difficulty, isDark);
+    final solved = problem.isSolved == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 26,
+                child: Text(
+                  '$index',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.4),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      problem.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: diffColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            problem.difficulty,
+                            style: textTheme.labelSmall?.copyWith(
+                              color: diffColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (problem.topics.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              problem.topics.first,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                solved ? Icons.check_circle : Icons.chevron_right,
+                color: solved
+                    ? AppTheme.getDifficultyColor('easy', isDark)
+                    : colorScheme.onSurface.withOpacity(0.4),
+                size: solved ? 20 : 22,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── _EmptyHint ───────────────────────────────────────────────────────────────
+
+class _EmptyHint extends StatelessWidget {
+  const _EmptyHint({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+      ),
+      child: Center(
+        child: Text(
+          text,
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurface.withOpacity(0.6),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -318,98 +936,151 @@ class _DifficultyCard extends StatelessWidget {
     required this.label,
     required this.count,
     required this.color,
+    this.onTap,
   });
 
   final String label;
   final int count;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    
-    return Container(
-      height: 80,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            label,
-            style: textTheme.titleSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.bold,
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        height: 92,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '$count',
+              style: textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$count',
-            style: textTheme.displaySmall?.copyWith(
-              fontWeight: FontWeight.bold,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface.withOpacity(0.7),
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class _ContestCard extends StatelessWidget {
-  const _ContestCard({required this.contest});
+  const _ContestCard({required this.contest, this.onTap});
 
   final ContestModel contest;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    
+    final isLive = contest.status == 'live';
+    final statusColor = isLive ? const Color(0xFF00B8A3) : colorScheme.primary;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            contest.title,
-            style: textTheme.headlineSmall,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.emoji_events, color: statusColor, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (isLive) ...[
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF00B8A3),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Flexible(
+                          child: Text(
+                            contest.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isLive
+                          ? 'Live now'
+                          : _getCountdown(contest.startTime),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: colorScheme.onSurface.withOpacity(0.4)),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            _formatDateTime(contest.startTime),
-            style: textTheme.bodySmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _getCountdown(contest.startTime),
-            style: textTheme.titleSmall?.copyWith(
-              color: colorScheme.primary,
-            ),
-          ),
-        ],
+        ),
       ),
     );
-  }
-
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   String _getCountdown(DateTime startTime) {
     final now = DateTime.now();
     final diff = startTime.difference(now);
     if (diff.isNegative) return 'Started';
-    final hours = diff.inHours;
+    final days = diff.inDays;
+    final hours = diff.inHours % 24;
     final minutes = diff.inMinutes % 60;
+    if (days > 0) return 'Starts in ${days}d ${hours}h';
     return 'Starts in ${hours}h ${minutes}m';
   }
 }

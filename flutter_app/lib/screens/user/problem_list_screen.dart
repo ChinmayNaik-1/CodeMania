@@ -21,6 +21,7 @@ class ProblemListScreen extends ConsumerStatefulWidget {
 
 class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
   String _selectedTab = 'All';
+  String? _selectedTopic;
   String _search = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -63,6 +64,16 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
                (p.problemNumber?.toString() ?? '').contains(query);
       }).toList();
     }
+
+    if (_selectedTopic != null) {
+      filteredProblems = filteredProblems.where((p) => p.topics.contains(_selectedTopic)).toList();
+    }
+
+    final allTopics = state.problems
+        .expand((p) => p.topics)
+        .toSet()
+        .toList()
+        ..sort();
 
     final content = Column(
       children: [
@@ -115,6 +126,42 @@ class _ProblemListScreenState extends ConsumerState<ProblemListScreen> {
             ),
           ),
         ),
+
+        // Topics
+        if (allTopics.isNotEmpty)
+          Container(
+            height: 48,
+            margin: const EdgeInsets.only(bottom: 8),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: allTopics.map((topic) {
+                  final isActive = _selectedTopic == topic;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      label: Text(topic),
+                      selected: isActive,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedTopic = selected ? topic : null;
+                        });
+                      },
+                      backgroundColor: Colors.transparent,
+                      selectedColor: colorScheme.primaryContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: isActive ? Colors.transparent : colorScheme.outline.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
 
         // Problem list
         Expanded(
