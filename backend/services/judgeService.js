@@ -382,49 +382,59 @@ export async function runAgainstTestCase(code, language, version, stdin) {
     };
 
     let response;
+    let retries = 3;
+    let delayMs = 1500;
 
-    try {
-      response = await axios.post(PISTON_URL, requestBody(primaryRuntime), axiosOptions);
-    } catch (error) {
-      const shouldRetry =
-        error?.response?.status === 400 &&
-        (!primaryRuntime.usedFallback || primaryRuntime.resolvedFrom === 'requested');
+    while (retries > 0) {
+      try {
+        response = await axios.post(PISTON_URL, requestBody(primaryRuntime), axiosOptions);
+        break;
+      } catch (error) {
+        const status = error?.response?.status;
+        // GitHub Codespaces proxy or rate limits
+        if ((status === 404 || status === 429 || status === 502 || status === 503) && retries > 1) {
+          retries--;
+          await new Promise((res) => setTimeout(res, delayMs));
+          delayMs += 1000;
+          continue;
+        }
 
-      if (shouldRetry) {
-        const fallbackRuntime = await resolvePistonRuntime(language, null, { forceRefresh: true });
-        const isDifferent =
-          fallbackRuntime.language !== primaryRuntime.language ||
-          fallbackRuntime.version !== primaryRuntime.version;
+        const shouldRetry =
+          status === 400 &&
+          (!primaryRuntime.usedFallback || primaryRuntime.resolvedFrom === 'requested');
 
-        if (fallbackRuntime.version && isDifferent) {
-          try {
-            response = await axios.post(PISTON_URL, requestBody(fallbackRuntime), axiosOptions);
-          } catch (fallbackError) {
-            console.error('=== PISTON ERROR (Fallback) ===');
+        if (shouldRetry) {
+          const fallbackRuntime = await resolvePistonRuntime(language, null, { forceRefresh: true });
+          const isDifferent =
+            fallbackRuntime.language !== primaryRuntime.language ||
+            fallbackRuntime.version !== primaryRuntime.version;
+
+          if (fallbackRuntime.version && isDifferent) {
+            try {
+              response = await axios.post(PISTON_URL, requestBody(fallbackRuntime), axiosOptions);
+              break;
+            } catch (fallbackError) {
+              console.error('=== PISTON ERROR (Fallback) ===');
+              console.error('URL called:', PISTON_URL);
+              console.error('Payload sent:', JSON.stringify(requestBody(fallbackRuntime), null, 2));
+              console.error('Status:', fallbackError.response?.status);
+              console.error('Message:', fallbackError.message);
+              throw fallbackError;
+            }
+          } else {
+            console.error('=== PISTON ERROR ===');
             console.error('URL called:', PISTON_URL);
-            console.error('Payload sent:', JSON.stringify(requestBody(fallbackRuntime), null, 2));
-            console.error('Status:', fallbackError.response?.status);
-            console.error('Response body:', JSON.stringify(fallbackError.response?.data, null, 2));
-            console.error('Message:', fallbackError.message);
-            throw fallbackError;
+            console.error('Status:', error.response?.status);
+            console.error('Message:', error.message);
+            throw error;
           }
         } else {
           console.error('=== PISTON ERROR ===');
           console.error('URL called:', PISTON_URL);
-          console.error('Payload sent:', JSON.stringify(requestBody(primaryRuntime), null, 2));
           console.error('Status:', error.response?.status);
-          console.error('Response body:', JSON.stringify(error.response?.data, null, 2));
           console.error('Message:', error.message);
           throw error;
         }
-      } else {
-        console.error('=== PISTON ERROR ===');
-        console.error('URL called:', PISTON_URL);
-        console.error('Payload sent:', JSON.stringify(requestBody(primaryRuntime), null, 2));
-        console.error('Status:', error.response?.status);
-        console.error('Response body:', JSON.stringify(error.response?.data, null, 2));
-        console.error('Message:', error.message);
-        throw error;
       }
     }
 
