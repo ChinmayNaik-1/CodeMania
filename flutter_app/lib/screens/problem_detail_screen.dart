@@ -506,7 +506,11 @@ class _SubmissionsTabState extends ConsumerState<SubmissionsTab> {
         
         return InkWell(
           onTap: () {
-            context.push('/problems/${widget.problemId}/submissions/${submission.id}');
+            String route = '/problems/${widget.problemId}/submissions/${submission.id}';
+            if (widget.contestId != null) {
+              route += '?contestId=${widget.contestId}';
+            }
+            context.push(route);
           },
           child: Container(
             padding: const EdgeInsets.all(12),

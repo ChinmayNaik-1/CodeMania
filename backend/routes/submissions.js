@@ -414,42 +414,14 @@ router.get('/problem/:problemId', authMiddleware, async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const submissionId = parseInt(req.params.id, 10);
+    const contestId = req.query.contestId ? parseInt(req.query.contestId, 10) : null;
+    
     if (Number.isNaN(submissionId)) {
       return res.status(400).json({ error: 'Invalid submission id', code: 'INVALID_INPUT' });
     }
 
-    const result = await dbPool.query(
-      `SELECT id,
-              COALESCE(status,
-                CASE verdict
-                  WHEN 'accepted' THEN 'Accepted'
-                  WHEN 'wrong_answer' THEN 'Wrong Answer'
-                  WHEN 'compilation_error' THEN 'Compile Error'
-                  WHEN 'runtime_error' THEN 'Runtime Error'
-                  WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
-                  ELSE 'Pending'
-                END
-              ) AS status,
-              language,
-              COALESCE(runtime_ms, time_ms) AS runtime_ms,
-              memory_kb,
-              passed_cases,
-              total_cases,
-              to_char((created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
-              code,
-              error_message,
-              stderr,
-              error_line,
-              NULL::text AS input,
-              NULL::text AS expected_output,
-              NULL::text AS your_output
-       FROM submissions
-       WHERE id = $1 AND user_id = $2`,
-      [submissionId, req.user.id]
-    );
-
-    if (result.rows.length === 0) {
-      const contestResult = await dbPool.query(
+    const checkContestSubmissions = async () => {
+      return await dbPool.query(
         `SELECT id,
                 COALESCE(
                   CASE verdict
@@ -478,15 +450,66 @@ router.get('/:id', authMiddleware, async (req, res) => {
          WHERE id = $1 AND user_id = $2`,
         [submissionId, req.user.id]
       );
+    };
 
-      if (contestResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Submission not found', code: 'NOT_FOUND' });
+    const checkNormalSubmissions = async () => {
+      return await dbPool.query(
+        `SELECT id,
+                COALESCE(status,
+                  CASE verdict
+                    WHEN 'accepted' THEN 'Accepted'
+                    WHEN 'wrong_answer' THEN 'Wrong Answer'
+                    WHEN 'compilation_error' THEN 'Compile Error'
+                    WHEN 'runtime_error' THEN 'Runtime Error'
+                    WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
+                    ELSE 'Pending'
+                  END
+                ) AS status,
+                language,
+                COALESCE(runtime_ms, time_ms) AS runtime_ms,
+                memory_kb,
+                passed_cases,
+                total_cases,
+                to_char((created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
+                code,
+                error_message,
+                stderr,
+                error_line,
+                NULL::text AS input,
+                NULL::text AS expected_output,
+                NULL::text AS your_output
+         FROM submissions
+         WHERE id = $1 AND user_id = $2`,
+        [submissionId, req.user.id]
+      );
+    };
+
+    if (contestId && !Number.isNaN(contestId)) {
+      // It's a contest submission, check contest table first
+      const contestResult = await checkContestSubmissions();
+      if (contestResult.rows.length > 0) {
+        return res.json({ submission: contestResult.rows[0] });
       }
-
-      return res.json({ submission: contestResult.rows[0] });
+      // Fallback just in case
+      const normalResult = await checkNormalSubmissions();
+      if (normalResult.rows.length > 0) {
+        return res.json({ submission: normalResult.rows[0] });
+      }
+    } else {
+      // Normal submission, check submissions table first
+      const normalResult = await checkNormalSubmissions();
+      if (normalResult.rows.length > 0) {
+        return res.json({ submission: normalResult.rows[0] });
+      }
+      // Fallback
+      const contestResult = await checkContestSubmissions();
+      if (contestResult.rows.length > 0) {
+        return res.json({ submission: contestResult.rows[0] });
+      }
     }
 
-    return res.json({ submission: result.rows[0] });
+    // If neither matched
+    return res.status(404).json({ error: 'Submission not found', code: 'NOT_FOUND' });
   } catch (error) {
     console.error('Get submission detail error:', error);
     return res.status(500).json({ error: 'Failed to fetch submission', code: 'FETCH_ERROR' });
