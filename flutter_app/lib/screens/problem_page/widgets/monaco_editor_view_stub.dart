@@ -22,25 +22,68 @@ class MonacoEditorView extends StatefulWidget {
 
 class _MonacoEditorViewState extends State<MonacoEditorView> {
   late final TextEditingController _controller;
-  late final UndoHistoryController _undoController;
+  
+  final List<String> _undoStack = [];
+  final List<String> _redoStack = [];
+  bool _isUndoingOrRedoing = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.code);
-    _undoController = UndoHistoryController();
     
-    _controller.addListener(() => widget.onCodeChanged(_controller.text));
-    _undoController.addListener(_updateState);
+    _controller.addListener(_onTextChanged);
     
     _attachController();
+  }
+  
+  void _onTextChanged() {
+    final newText = _controller.text;
+    if (!_isUndoingOrRedoing) {
+      if (_undoStack.isEmpty || _undoStack.last != newText) {
+        // Only push to undo stack if it's actually a change from the current state
+        final currentState = _undoStack.isEmpty ? widget.code : _undoStack.last;
+        if (newText != currentState) {
+          _undoStack.add(currentState);
+          _redoStack.clear();
+          _updateState();
+        }
+      }
+    }
+    widget.onCodeChanged(newText);
+  }
+
+  void _undo() {
+    if (_undoStack.isEmpty) return;
+    _isUndoingOrRedoing = true;
+    _redoStack.add(_controller.text);
+    final previous = _undoStack.removeLast();
+    _controller.value = TextEditingValue(
+      text: previous,
+      selection: TextSelection.collapsed(offset: previous.length),
+    );
+    _isUndoingOrRedoing = false;
+    _updateState();
+  }
+  
+  void _redo() {
+    if (_redoStack.isEmpty) return;
+    _isUndoingOrRedoing = true;
+    _undoStack.add(_controller.text);
+    final next = _redoStack.removeLast();
+    _controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: next.length),
+    );
+    _isUndoingOrRedoing = false;
+    _updateState();
   }
 
   void _updateState() {
     if (widget.controller != null) {
       widget.controller?.updateState(
-        canUndo: _undoController.value.canUndo,
-        canRedo: _undoController.value.canRedo,
+        canUndo: _undoStack.isNotEmpty,
+        canRedo: _redoStack.isNotEmpty,
         canFormat: widget.language != 'python',
       );
     }
@@ -48,8 +91,8 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
 
   void _attachController() {
     widget.controller?.attach(
-      onUndo: () => _undoController.undo(),
-      onRedo: () => _undoController.redo(),
+      onUndo: _undo,
+      onRedo: _redo,
       onFormat: _formatCode,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateState());
@@ -70,22 +113,23 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
         continue;
       }
       
-      if (line.startsWith('}')) {
-        indent = (indent - 1).clamp(0, 999);
-      }
+      int open = '{'.allMatches(line).length;
+      int close = '}'.allMatches(line).length;
+      
+      int decreaseBefore = line.startsWith('}') ? 1 : 0;
+      indent = (indent - decreaseBefore).clamp(0, 999);
       
       buffer.write('    ' * indent);
       buffer.write(line);
       if (i < lines.length - 1) buffer.writeln();
       
-      int open = '{'.allMatches(line).length;
-      int close = '}'.allMatches(line).length;
-      indent += (open - close);
+      indent += (open - close) + decreaseBefore;
       indent = indent.clamp(0, 999);
     }
     
     final newText = buffer.toString();
     if (newText != text) {
+      // It will trigger _onTextChanged and correctly add the unformatted code to the undo stack!
       _controller.value = TextEditingValue(
         text: newText,
         selection: TextSelection.collapsed(offset: newText.length),
@@ -97,6 +141,8 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   void didUpdateWidget(covariant MonacoEditorView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.code != widget.code && _controller.text != widget.code) {
+      // Programmatic change from outside (e.g., reset button)
+      // This will trigger _onTextChanged and add to undo stack!
       _controller.text = widget.code;
       _controller.selection = TextSelection.fromPosition(
         TextPosition(offset: _controller.text.length),
@@ -111,7 +157,6 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   @override
   void dispose() {
     widget.controller?.detach();
-    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -120,7 +165,6 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
-      undoController: _undoController,
       maxLines: null,
       expands: true,
       style: const TextStyle(
