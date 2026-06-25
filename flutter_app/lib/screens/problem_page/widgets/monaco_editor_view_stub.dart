@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 class MonacoEditorView extends StatefulWidget {
@@ -26,10 +27,16 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   final List<String> _undoStack = [];
   final List<String> _redoStack = [];
   bool _isUndoingOrRedoing = false;
+  
+  String _lastSavedState = "";
+  String _currentText = "";
+  Timer? _typingDebouncer;
 
   @override
   void initState() {
     super.initState();
+    _currentText = widget.code;
+    _lastSavedState = widget.code;
     _controller = TextEditingController(text: widget.code);
     
     _controller.addListener(_onTextChanged);
@@ -39,25 +46,53 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   
   void _onTextChanged() {
     final newText = _controller.text;
+    if (_currentText == newText) return;
+
     if (!_isUndoingOrRedoing) {
-      if (_undoStack.isEmpty || _undoStack.last != newText) {
-        // Only push to undo stack if it's actually a change from the current state
-        final currentState = _undoStack.isEmpty ? widget.code : _undoStack.last;
-        if (newText != currentState) {
-          _undoStack.add(currentState);
-          _redoStack.clear();
-          _updateState();
-        }
+      final bool isSignificantChange = (newText.length - _currentText.length).abs() > 1;
+      
+      _currentText = newText;
+      _redoStack.clear();
+      
+      if (isSignificantChange) {
+        _typingDebouncer?.cancel();
+        _pushUndo();
+      } else {
+        _typingDebouncer?.cancel();
+        _typingDebouncer = Timer(const Duration(milliseconds: 800), () {
+          if (mounted) _pushUndo();
+        });
       }
+    } else {
+      _currentText = newText;
     }
+    
     widget.onCodeChanged(newText);
   }
 
+  void _pushUndo() {
+    if (_lastSavedState != _currentText) {
+      _undoStack.add(_lastSavedState);
+      _lastSavedState = _currentText;
+      _updateState();
+    }
+  }
+
   void _undo() {
+    _typingDebouncer?.cancel();
     if (_undoStack.isEmpty) return;
+    
+    if (_lastSavedState != _currentText) {
+       _undoStack.add(_lastSavedState);
+    }
+    
     _isUndoingOrRedoing = true;
-    _redoStack.add(_controller.text);
+    _redoStack.add(_currentText);
+    
     final previous = _undoStack.removeLast();
+    _lastSavedState = previous;
+    _currentText = previous;
+    
     _controller.value = TextEditingValue(
       text: previous,
       selection: TextSelection.collapsed(offset: previous.length),
@@ -67,10 +102,16 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   }
   
   void _redo() {
+    _typingDebouncer?.cancel();
     if (_redoStack.isEmpty) return;
+    
     _isUndoingOrRedoing = true;
-    _undoStack.add(_controller.text);
+    _undoStack.add(_currentText);
+    
     final next = _redoStack.removeLast();
+    _lastSavedState = next;
+    _currentText = next;
+    
     _controller.value = TextEditingValue(
       text: next,
       selection: TextSelection.collapsed(offset: next.length),
@@ -113,8 +154,14 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
         continue;
       }
       
-      int open = '{'.allMatches(line).length;
-      int close = '}'.allMatches(line).length;
+      // Strip strings and comments before counting braces
+      String codeForCounting = line
+          .replaceAll(RegExp(r'".*?"'), '')
+          .replaceAll(RegExp(r"'.*?'"), '')
+          .replaceAll(RegExp(r'//.*'), '');
+      
+      int open = '{'.allMatches(codeForCounting).length;
+      int close = '}'.allMatches(codeForCounting).length;
       
       int decreaseBefore = line.startsWith('}') ? 1 : 0;
       indent = (indent - decreaseBefore).clamp(0, 999);
@@ -129,7 +176,6 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
     
     final newText = buffer.toString();
     if (newText != text) {
-      // It will trigger _onTextChanged and correctly add the unformatted code to the undo stack!
       _controller.value = TextEditingValue(
         text: newText,
         selection: TextSelection.collapsed(offset: newText.length),
@@ -156,6 +202,7 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
 
   @override
   void dispose() {
+    _typingDebouncer?.cancel();
     widget.controller?.detach();
     _controller.dispose();
     super.dispose();
