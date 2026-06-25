@@ -395,15 +395,10 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
           _loadUserCodeForLanguage(problemState.selectedLanguage);
         });
       }
-    }
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: SafeArea(
-        top: false,
-        bottom: true,
-        child: Stack(
-          children: [
+    return Stack(
+      children: [
         Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -592,6 +587,7 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
                     onClose: () {
                       ref.read(consoleSheetVisibleProvider.notifier).state = false;
                     },
+                    systemBottomPadding: bottomPadding,
                   ),
                 );
               },
@@ -629,9 +625,7 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    ),
+      ],
     );
   }
 }
