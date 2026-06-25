@@ -60,6 +60,16 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
       onRedo: () => js_util.callMethod(html.window, 'codemaniaMonacoRedo', [_containerId]),
       onFormat: () => js_util.callMethod(html.window, 'codemaniaMonacoFormat', [_containerId]),
     );
+    
+    js_util.setProperty(
+      html.window,
+      'codemaniaMonacoStateCallback',
+      js_util.allowInterop((String cid, bool canUndo, bool canRedo) {
+        if (cid == _containerId && widget.controller != null) {
+          widget.controller?.updateState(canUndo: canUndo, canRedo: canRedo);
+        }
+      }),
+    );
   }
 
   String _monacoLanguage(String language) {

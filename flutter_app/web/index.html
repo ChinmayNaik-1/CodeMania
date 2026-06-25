@@ -179,6 +179,24 @@
 
         editors[containerId] = editor;
         activeEditorContainerId = containerId;
+
+        const model = editor.getModel();
+        let initialVersionId = model ? model.getAlternativeVersionId() : 1;
+        let maxVersionId = initialVersionId;
+
+        editor.onDidChangeModelContent(function() {
+          if (window.codemaniaMonacoStateCallback && model) {
+            const currentVersion = model.getAlternativeVersionId();
+            if (currentVersion > maxVersionId) {
+              maxVersionId = currentVersion;
+            }
+            
+            const canUndo = currentVersion !== initialVersionId;
+            const canRedo = currentVersion !== maxVersionId;
+            
+            window.codemaniaMonacoStateCallback(containerId, canUndo, canRedo);
+          }
+        });
       }
 
       window.codemaniaMonacoCreateEditor = function(containerId, options) {
@@ -224,18 +242,21 @@
       window.codemaniaMonacoUndo = function(containerId) {
         const editor = editors[containerId];
         if (!editor) return;
+        editor.focus();
         editor.trigger('keyboard', 'undo', null);
       };
 
       window.codemaniaMonacoRedo = function(containerId) {
         const editor = editors[containerId];
         if (!editor) return;
+        editor.focus();
         editor.trigger('keyboard', 'redo', null);
       };
 
       window.codemaniaMonacoFormat = function(containerId) {
         const editor = editors[containerId];
         if (!editor) return;
+        editor.focus();
         const formatAction = editor.getAction('editor.action.formatDocument');
         if (formatAction) formatAction.run();
       };

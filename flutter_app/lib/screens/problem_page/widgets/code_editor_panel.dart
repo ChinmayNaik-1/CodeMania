@@ -30,18 +30,24 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
     IconData icon, {
     required String tooltip,
     required VoidCallback onTap,
+    bool enabled = true,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = enabled 
+        ? (isDark ? const Color(0xFFEBEBEB) : const Color(0xFF262626)) 
+        : const Color(0xFF8A8A8A);
+
     return Tooltip(
       message: tooltip,
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(4),
         child: Padding(
-          padding: EdgeInsets.all(6),
+          padding: const EdgeInsets.all(6),
           child: Icon(
             icon,
             size: 16,
-            color: const Color(0xFF8A8A8A),
+            color: color,
           ),
         ),
       ),
@@ -115,25 +121,38 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
                 style: const TextStyle(fontSize: 12, color: Color(0xFF8A8A8A)),
               ),
               const Spacer(),
-              _headerIcon(
-                Icons.format_align_left_outlined,
-                tooltip: 'Format',
-                onTap: () {
-                  _editorController.formatDocument();
-                },
-              ),
-              _headerIcon(
-                Icons.undo,
-                tooltip: 'Undo',
-                onTap: () {
-                  _editorController.undo();
-                },
-              ),
-              _headerIcon(
-                Icons.redo,
-                tooltip: 'Redo',
-                onTap: () {
-                  _editorController.redo();
+              AnimatedBuilder(
+                animation: _editorController,
+                builder: (context, _) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _headerIcon(
+                        Icons.format_align_left_outlined,
+                        tooltip: 'Format',
+                        enabled: _editorController.canFormat,
+                        onTap: () {
+                          _editorController.formatDocument();
+                        },
+                      ),
+                      _headerIcon(
+                        Icons.undo,
+                        tooltip: 'Undo',
+                        enabled: _editorController.canUndo,
+                        onTap: () {
+                          _editorController.undo();
+                        },
+                      ),
+                      _headerIcon(
+                        Icons.redo,
+                        tooltip: 'Redo',
+                        enabled: _editorController.canRedo,
+                        onTap: () {
+                          _editorController.redo();
+                        },
+                      ),
+                    ],
+                  );
                 },
               ),
             ],
