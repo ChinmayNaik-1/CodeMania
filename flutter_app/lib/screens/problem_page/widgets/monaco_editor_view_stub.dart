@@ -74,7 +74,7 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
         indent = (indent - 1).clamp(0, 999);
       }
       
-      buffer.write('  ' * indent);
+      buffer.write('    ' * indent);
       buffer.write(line);
       if (i < lines.length - 1) buffer.writeln();
       
