@@ -42,62 +42,66 @@ class TestcaseBottomSheet extends ConsumerWidget {
           ),
         ],
       ),
-      child: Column(
-        children: [
-          // Header with tabs
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: colorScheme.outline)),
-            ),
-            child: Row(
-              children: [
-                // Tabs
-                Expanded(
-                  child: Row(
-                    children: [
-                      _TabButton(
-                        label: 'Testcase',
-                        isSelected: selectedTab == 0,
-                        onTap: () {
-                          ref.read(consoleSheetTabProvider.notifier).state = 0;
-                        },
-                      ),
-                      const SizedBox(width: 16),
-                      _TabButton(
-                        label: 'Run Result',
-                        isSelected: selectedTab == 1,
-                        onTap: () {
-                          ref.read(consoleSheetTabProvider.notifier).state = 1;
-                        },
-                      ),
-                    ],
+      child: SafeArea(
+        top: false,
+        maintainBottomViewPadding: true,
+        child: Column(
+          children: [
+            // Header with tabs
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: colorScheme.outline)),
+              ),
+              child: Row(
+                children: [
+                  // Tabs
+                  Expanded(
+                    child: Row(
+                      children: [
+                        _TabButton(
+                          label: 'Testcase',
+                          isSelected: selectedTab == 0,
+                          onTap: () {
+                            ref.read(consoleSheetTabProvider.notifier).state = 0;
+                          },
+                        ),
+                        const SizedBox(width: 16),
+                        _TabButton(
+                          label: 'Run Result',
+                          isSelected: selectedTab == 1,
+                          onTap: () {
+                            ref.read(consoleSheetTabProvider.notifier).state = 1;
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                // Close button
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: onClose,
-                ),
-              ],
+                  // Close button
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: onClose,
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // Content
-          Expanded(
-            child: selectedTab == 0
-                ? _TestcaseTab(
-                    problem: problem,
-                    problemId: problemId,
-                    onRun: onRun,
-                    onSubmit: onSubmit,
-                  )
-                : _RunResultTab(
-                    problem: problem,
-                    problemId: problemId,
-                  ),
-          ),
-        ],
+            // Content
+            Expanded(
+              child: selectedTab == 0
+                  ? _TestcaseTab(
+                      problem: problem,
+                      problemId: problemId,
+                      onRun: onRun,
+                      onSubmit: onSubmit,
+                    )
+                  : _RunResultTab(
+                      problem: problem,
+                      problemId: problemId,
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
