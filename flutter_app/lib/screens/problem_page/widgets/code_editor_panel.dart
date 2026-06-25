@@ -160,6 +160,7 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
         ),
         Expanded(
           child: MonacoEditorView(
+            key: ValueKey(widget.selectedLanguage),
             code: widget.currentCode,
             language: widget.selectedLanguage,
             theme: isDark ? 'vs-dark' : 'vs',
