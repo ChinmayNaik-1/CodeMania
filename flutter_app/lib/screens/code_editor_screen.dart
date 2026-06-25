@@ -397,8 +397,13 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
       }
     }
 
-    return Stack(
-      children: [
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        top: false,
+        bottom: true,
+        child: Stack(
+          children: [
         Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -452,9 +457,38 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
             ],
           ),
           IconButton(
-            icon: const Icon(Icons.tune),
-            onPressed: () {
-              // TODO: Show editor settings
+            icon: const Icon(Icons.restore),
+            tooltip: 'Reset to starter code',
+            onPressed: () async {
+              final problem = problemState.problem;
+              final lang = problemState.selectedLanguage;
+              if (problem == null) return;
+              
+              final initialStub = ref
+                  .read(problemProvider(widget.problemId).notifier)
+                  .resolveStub(problem.codeStubs, lang);
+                  
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Reset Code'),
+                  content: const Text('Are you sure you want to reset your code to the starter template? This will erase your current code.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Reset', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              
+              if (confirm == true) {
+                _onEditorCodeChanged(initialStub);
+              }
             },
           ),
         ],
@@ -595,7 +629,9 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
               ),
             ),
           ),
-      ],
+        ],
+      ),
+    ),
     );
   }
 }

@@ -27,10 +27,8 @@ class TestcaseBottomSheet extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final selectedTab = ref.watch(consoleSheetTabProvider);
 
-    final viewPadding = MediaQuery.viewPaddingOf(context).bottom;
-
     return Container(
-      height: MediaQuery.of(context).size.height * 0.5 + viewPadding,
+      height: MediaQuery.of(context).size.height * 0.5,
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -42,66 +40,62 @@ class TestcaseBottomSheet extends ConsumerWidget {
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        maintainBottomViewPadding: true,
-        child: Column(
-          children: [
-            // Header with tabs
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: colorScheme.outline)),
-              ),
-              child: Row(
-                children: [
-                  // Tabs
-                  Expanded(
-                    child: Row(
-                      children: [
-                        _TabButton(
-                          label: 'Testcase',
-                          isSelected: selectedTab == 0,
-                          onTap: () {
-                            ref.read(consoleSheetTabProvider.notifier).state = 0;
-                          },
-                        ),
-                        const SizedBox(width: 16),
-                        _TabButton(
-                          label: 'Run Result',
-                          isSelected: selectedTab == 1,
-                          onTap: () {
-                            ref.read(consoleSheetTabProvider.notifier).state = 1;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Close button
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: onClose,
-                  ),
-                ],
-              ),
+      child: Column(
+        children: [
+          // Header with tabs
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: colorScheme.outline)),
             ),
+            child: Row(
+              children: [
+                // Tabs
+                Expanded(
+                  child: Row(
+                    children: [
+                      _TabButton(
+                        label: 'Testcase',
+                        isSelected: selectedTab == 0,
+                        onTap: () {
+                          ref.read(consoleSheetTabProvider.notifier).state = 0;
+                        },
+                      ),
+                      const SizedBox(width: 16),
+                      _TabButton(
+                        label: 'Run Result',
+                        isSelected: selectedTab == 1,
+                        onTap: () {
+                          ref.read(consoleSheetTabProvider.notifier).state = 1;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                // Close button
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: onClose,
+                ),
+              ],
+            ),
+          ),
 
-            // Content
-            Expanded(
-              child: selectedTab == 0
-                  ? _TestcaseTab(
-                      problem: problem,
-                      problemId: problemId,
-                      onRun: onRun,
-                      onSubmit: onSubmit,
-                    )
-                  : _RunResultTab(
-                      problem: problem,
-                      problemId: problemId,
-                    ),
-            ),
-          ],
-        ),
+          // Content
+          Expanded(
+            child: selectedTab == 0
+                ? _TestcaseTab(
+                    problem: problem,
+                    problemId: problemId,
+                    onRun: onRun,
+                    onSubmit: onSubmit,
+                  )
+                : _RunResultTab(
+                    problem: problem,
+                    problemId: problemId,
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -259,12 +253,7 @@ class _TestcaseTabState extends ConsumerState<_TestcaseTab>
 
         // Bottom buttons
         Container(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            16 + MediaQuery.viewPaddingOf(context).bottom,
-          ),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             border: Border(top: BorderSide(color: colorScheme.outline)),
           ),
@@ -468,12 +457,7 @@ class _RunResultTabState extends ConsumerState<_RunResultTab>
           // Selected case details
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 + MediaQuery.viewPaddingOf(context).bottom,
-              ),
+              padding: const EdgeInsets.all(16),
               child: () {
                 if (selectedCaseIndex >= caseResults.length) {
                   return const Text('Invalid case selected');
