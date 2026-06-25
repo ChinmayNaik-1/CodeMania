@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:codemania/services/api_service.dart';
 import 'package:codemania/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
+import 'package:codemania/providers/submission_provider.dart';
 
 final submissionDetailProvider = FutureProvider.family<Map<String, dynamic>, ({int submissionId, int? contestId})>((ref, arg) async {
   return await ref.read(submissionProvider.notifier).fetchSubmissionById(arg.submissionId, contestId: arg.contestId) ?? {};
