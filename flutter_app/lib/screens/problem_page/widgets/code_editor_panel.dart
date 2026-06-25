@@ -25,6 +25,7 @@ class CodeEditorPanel extends StatefulWidget {
 }
 
 class _CodeEditorPanelState extends State<CodeEditorPanel> {
+  final MonacoEditorController _editorController = MonacoEditorController();
   Widget _headerIcon(
     IconData icon, {
     required String tooltip,
@@ -117,17 +118,23 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
               _headerIcon(
                 Icons.format_align_left_outlined,
                 tooltip: 'Format',
-                onTap: () {},
+                onTap: () {
+                  _editorController.formatDocument();
+                },
               ),
               _headerIcon(
                 Icons.undo,
                 tooltip: 'Undo',
-                onTap: () {},
+                onTap: () {
+                  _editorController.undo();
+                },
               ),
               _headerIcon(
-                Icons.fullscreen,
-                tooltip: 'Fullscreen',
-                onTap: () {},
+                Icons.redo,
+                tooltip: 'Redo',
+                onTap: () {
+                  _editorController.redo();
+                },
               ),
             ],
           ),
@@ -138,6 +145,7 @@ class _CodeEditorPanelState extends State<CodeEditorPanel> {
             language: widget.selectedLanguage,
             theme: isDark ? 'vs-dark' : 'vs',
             onCodeChanged: widget.onCodeChanged,
+            controller: _editorController,
           ),
         ),
         Container(

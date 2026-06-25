@@ -13,12 +13,14 @@ class MonacoEditorView extends StatefulWidget {
     required this.language,
     required this.theme,
     required this.onCodeChanged,
+    this.controller,
   });
 
   final String code;
   final String language;
   final String theme;
   final ValueChanged<String> onCodeChanged;
+  final dynamic controller;
 
   @override
   State<MonacoEditorView> createState() => _MonacoEditorViewState();
@@ -53,6 +55,11 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
       _createEditor();
       _startPolling();
     });
+    widget.controller?.attach(
+      onUndo: () => js_util.callMethod(html.window, 'codemaniaMonacoUndo', [_containerId]),
+      onRedo: () => js_util.callMethod(html.window, 'codemaniaMonacoRedo', [_containerId]),
+      onFormat: () => js_util.callMethod(html.window, 'codemaniaMonacoFormat', [_containerId]),
+    );
   }
 
   String _monacoLanguage(String language) {
@@ -137,12 +144,22 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_disposed) _layout();
     });
+
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.detach();
+      widget.controller?.attach(
+        onUndo: () => js_util.callMethod(html.window, 'codemaniaMonacoUndo', [_containerId]),
+        onRedo: () => js_util.callMethod(html.window, 'codemaniaMonacoRedo', [_containerId]),
+        onFormat: () => js_util.callMethod(html.window, 'codemaniaMonacoFormat', [_containerId]),
+      );
+    }
   }
 
   @override
   void dispose() {
     _disposed = true;
     _pollTimer?.cancel();
+    widget.controller?.detach();
     js_util.callMethod(html.window, 'codemaniaMonacoDispose', [_containerId]);
     super.dispose();
   }

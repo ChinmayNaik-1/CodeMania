@@ -7,12 +7,14 @@ class MonacoEditorView extends StatefulWidget {
     required this.language,
     required this.theme,
     required this.onCodeChanged,
+    this.controller,
   });
 
   final String code;
   final String language;
   final String theme;
   final ValueChanged<String> onCodeChanged;
+  final dynamic controller;
 
   @override
   State<MonacoEditorView> createState() => _MonacoEditorViewState();
@@ -26,6 +28,11 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
     super.initState();
     _controller = TextEditingController(text: widget.code);
     _controller.addListener(() => widget.onCodeChanged(_controller.text));
+    widget.controller?.attach(
+      onUndo: () {}, // Stub
+      onRedo: () {}, // Stub
+      onFormat: () {}, // Stub
+    );
   }
 
   @override
@@ -37,10 +44,19 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
         TextPosition(offset: _controller.text.length),
       );
     }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.detach();
+      widget.controller?.attach(
+        onUndo: () {}, // Stub
+        onRedo: () {}, // Stub
+        onFormat: () {}, // Stub
+      );
+    }
   }
 
   @override
   void dispose() {
+    widget.controller?.detach();
     _controller.dispose();
     super.dispose();
   }

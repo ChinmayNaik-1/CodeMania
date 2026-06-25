@@ -221,6 +221,25 @@
         editor.layout();
       };
 
+      window.codemaniaMonacoUndo = function(containerId) {
+        const editor = editors[containerId];
+        if (!editor) return;
+        editor.trigger('keyboard', 'undo', null);
+      };
+
+      window.codemaniaMonacoRedo = function(containerId) {
+        const editor = editors[containerId];
+        if (!editor) return;
+        editor.trigger('keyboard', 'redo', null);
+      };
+
+      window.codemaniaMonacoFormat = function(containerId) {
+        const editor = editors[containerId];
+        if (!editor) return;
+        const formatAction = editor.getAction('editor.action.formatDocument');
+        if (formatAction) formatAction.run();
+      };
+
       window.codemaniaMonacoDispose = function(containerId) {
         const editor = editors[containerId];
         if (!editor) return;
