@@ -336,41 +336,69 @@ router.get('/problem/:problemId', authMiddleware, async (req, res) => {
     const limit = Number.isNaN(limitRaw) ? 20 : Math.min(Math.max(limitRaw, 1), 100);
     const offset = (page - 1) * limit;
 
-    const result = await dbPool.query(
-      `SELECT * FROM (
-         SELECT id,
-                COALESCE(status,
+    const contestId = req.query.contestId ? parseInt(req.query.contestId, 10) : null;
+
+    let result;
+    if (contestId && !Number.isNaN(contestId)) {
+      result = await dbPool.query(
+        `SELECT id,
+                COALESCE(
                   CASE verdict
                     WHEN 'accepted' THEN 'Accepted'
                     WHEN 'wrong_answer' THEN 'Wrong Answer'
                     WHEN 'compilation_error' THEN 'Compile Error'
                     WHEN 'runtime_error' THEN 'Runtime Error'
                     WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
-                    ELSE 'Pending'
+                    ELSE verdict
                   END
                 ) AS status,
-                language,
-                COALESCE(runtime_ms, time_ms) AS runtime_ms,
-                memory_kb,
-                to_char((created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
-         FROM submissions
-         WHERE user_id = $1 AND problem_id = $2
-         
-         UNION ALL
-         
-         SELECT id,
-                verdict AS status,
                 language,
                 time_ms AS runtime_ms,
                 0 AS memory_kb,
                 to_char((submitted_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
          FROM contest_submissions
-         WHERE user_id = $1 AND problem_id = $2
-       ) all_subs
-       ORDER BY created_at DESC
-       LIMIT $3 OFFSET $4`,
-      [req.user.id, problemId, limit, offset]
-    );
+         WHERE user_id = $1 AND problem_id = $2 AND contest_id = $5
+         ORDER BY submitted_at DESC
+         LIMIT $3 OFFSET $4`,
+        [req.user.id, problemId, limit, offset, contestId]
+      );
+    } else {
+      result = await dbPool.query(
+        `SELECT * FROM (
+           SELECT id,
+                  COALESCE(status,
+                    CASE verdict
+                      WHEN 'accepted' THEN 'Accepted'
+                      WHEN 'wrong_answer' THEN 'Wrong Answer'
+                      WHEN 'compilation_error' THEN 'Compile Error'
+                      WHEN 'runtime_error' THEN 'Runtime Error'
+                      WHEN 'time_limit_exceeded' THEN 'Time Limit Exceeded'
+                      ELSE 'Pending'
+                    END
+                  ) AS status,
+                  language,
+                  COALESCE(runtime_ms, time_ms) AS runtime_ms,
+                  memory_kb,
+                  to_char((created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+           FROM submissions
+           WHERE user_id = $1 AND problem_id = $2
+           
+           UNION ALL
+           
+           SELECT id,
+                  verdict AS status,
+                  language,
+                  time_ms AS runtime_ms,
+                  0 AS memory_kb,
+                  to_char((submitted_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at
+           FROM contest_submissions
+           WHERE user_id = $1 AND problem_id = $2
+         ) all_subs
+         ORDER BY created_at DESC
+         LIMIT $3 OFFSET $4`,
+        [req.user.id, problemId, limit, offset]
+      );
+    }
 
     return res.json({
       submissions: result.rows,

@@ -162,6 +162,7 @@ class SubmissionNotifier extends StateNotifier<SubmissionState> {
       if (problemId != null) {
         // Use the specific endpoint for problem submissions
         url = '/api/submissions/problem/$problemId?page=$page';
+        if (contestId != null) url += '&contestId=$contestId';
       } else {
         // Fallback to general submit endpoint with query params
         url = '/submit?page=$page';

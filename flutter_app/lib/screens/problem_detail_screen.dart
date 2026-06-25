@@ -92,7 +92,7 @@ class _ProblemDetailScreenState extends ConsumerState<ProblemDetailScreen>
                   controller: _tabController,
                   children: [
                     DescriptionTab(problem: problem),
-                    SubmissionsTab(problemId: widget.problemId),
+                    SubmissionsTab(problemId: widget.problemId, contestId: widget.contestId),
                     const EditorialTab(),
                   ],
                 ),
@@ -444,9 +444,10 @@ class _DifficultyChip extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class SubmissionsTab extends ConsumerStatefulWidget {
-  const SubmissionsTab({super.key, required this.problemId});
+  const SubmissionsTab({super.key, required this.problemId, this.contestId});
 
   final int problemId;
+  final int? contestId;
 
   @override
   ConsumerState<SubmissionsTab> createState() => _SubmissionsTabState();
@@ -458,7 +459,7 @@ class _SubmissionsTabState extends ConsumerState<SubmissionsTab> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Fetch submissions for this problem
-      ref.read(submissionProvider.notifier).fetchHistory(problemId: widget.problemId);
+      ref.read(submissionProvider.notifier).fetchHistory(problemId: widget.problemId, contestId: widget.contestId);
     });
   }
 
