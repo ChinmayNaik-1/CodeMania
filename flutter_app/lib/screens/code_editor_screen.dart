@@ -395,6 +395,7 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
           _loadUserCodeForLanguage(problemState.selectedLanguage);
         });
       }
+    }
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Stack(
