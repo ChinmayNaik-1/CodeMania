@@ -22,17 +22,75 @@ class MonacoEditorView extends StatefulWidget {
 
 class _MonacoEditorViewState extends State<MonacoEditorView> {
   late final TextEditingController _controller;
+  late final UndoHistoryController _undoController;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.code);
+    _undoController = UndoHistoryController();
+    
     _controller.addListener(() => widget.onCodeChanged(_controller.text));
+    _undoController.addListener(_updateState);
+    
+    _attachController();
+  }
+
+  void _updateState() {
+    if (widget.controller != null) {
+      widget.controller?.updateState(
+        canUndo: _undoController.value.canUndo,
+        canRedo: _undoController.value.canRedo,
+        canFormat: widget.language != 'python',
+      );
+    }
+  }
+
+  void _attachController() {
     widget.controller?.attach(
-      onUndo: () {}, // Stub
-      onRedo: () {}, // Stub
-      onFormat: () {}, // Stub
+      onUndo: () => _undoController.undo(),
+      onRedo: () => _undoController.redo(),
+      onFormat: _formatCode,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateState());
+  }
+
+  void _formatCode() {
+    if (widget.language == 'python') return; // Cannot auto-indent python safely
+    
+    final text = _controller.text;
+    final lines = text.split('\n');
+    int indent = 0;
+    final buffer = StringBuffer();
+    
+    for (int i = 0; i < lines.length; i++) {
+      String line = lines[i].trim();
+      if (line.isEmpty) {
+        buffer.writeln();
+        continue;
+      }
+      
+      if (line.startsWith('}')) {
+        indent = (indent - 1).clamp(0, 999);
+      }
+      
+      buffer.write('  ' * indent);
+      buffer.write(line);
+      if (i < lines.length - 1) buffer.writeln();
+      
+      int open = '{'.allMatches(line).length;
+      int close = '}'.allMatches(line).length;
+      indent += (open - close);
+      indent = indent.clamp(0, 999);
+    }
+    
+    final newText = buffer.toString();
+    if (newText != text) {
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
+    }
   }
 
   @override
@@ -46,17 +104,14 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
     }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller?.detach();
-      widget.controller?.attach(
-        onUndo: () {}, // Stub
-        onRedo: () {}, // Stub
-        onFormat: () {}, // Stub
-      );
+      _attachController();
     }
   }
 
   @override
   void dispose() {
     widget.controller?.detach();
+    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -65,6 +120,7 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
+      undoController: _undoController,
       maxLines: null,
       expands: true,
       style: const TextStyle(
