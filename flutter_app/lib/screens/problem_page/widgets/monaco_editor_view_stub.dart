@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 
 class MonacoEditorView extends StatefulWidget {
@@ -23,108 +22,25 @@ class MonacoEditorView extends StatefulWidget {
 
 class _MonacoEditorViewState extends State<MonacoEditorView> {
   late final TextEditingController _controller;
-  
-  final List<String> _undoStack = [];
-  final List<String> _redoStack = [];
-  bool _isUndoingOrRedoing = false;
-  
-  String _lastSavedState = "";
-  String _currentText = "";
-  Timer? _typingDebouncer;
+  late final UndoHistoryController _undoController;
 
   @override
   void initState() {
     super.initState();
-    _currentText = widget.code;
-    _lastSavedState = widget.code;
     _controller = TextEditingController(text: widget.code);
+    _undoController = UndoHistoryController();
     
-    _controller.addListener(_onTextChanged);
+    _controller.addListener(() => widget.onCodeChanged(_controller.text));
+    _undoController.addListener(_updateState);
     
     _attachController();
-  }
-  
-  void _onTextChanged() {
-    final newText = _controller.text;
-    if (_currentText == newText) return;
-
-    if (!_isUndoingOrRedoing) {
-      final bool isSignificantChange = (newText.length - _currentText.length).abs() > 1;
-      
-      _currentText = newText;
-      _redoStack.clear();
-      
-      if (isSignificantChange) {
-        _typingDebouncer?.cancel();
-        _pushUndo();
-      } else {
-        _typingDebouncer?.cancel();
-        _typingDebouncer = Timer(const Duration(milliseconds: 800), () {
-          if (mounted) _pushUndo();
-        });
-      }
-    } else {
-      _currentText = newText;
-    }
-    
-    widget.onCodeChanged(newText);
-  }
-
-  void _pushUndo() {
-    if (_lastSavedState != _currentText) {
-      _undoStack.add(_lastSavedState);
-      _lastSavedState = _currentText;
-      _updateState();
-    }
-  }
-
-  void _undo() {
-    _typingDebouncer?.cancel();
-    if (_undoStack.isEmpty) return;
-    
-    if (_lastSavedState != _currentText) {
-       _undoStack.add(_lastSavedState);
-    }
-    
-    _isUndoingOrRedoing = true;
-    _redoStack.add(_currentText);
-    
-    final previous = _undoStack.removeLast();
-    _lastSavedState = previous;
-    _currentText = previous;
-    
-    _controller.value = TextEditingValue(
-      text: previous,
-      selection: TextSelection.collapsed(offset: previous.length),
-    );
-    _isUndoingOrRedoing = false;
-    _updateState();
-  }
-  
-  void _redo() {
-    _typingDebouncer?.cancel();
-    if (_redoStack.isEmpty) return;
-    
-    _isUndoingOrRedoing = true;
-    _undoStack.add(_currentText);
-    
-    final next = _redoStack.removeLast();
-    _lastSavedState = next;
-    _currentText = next;
-    
-    _controller.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: next.length),
-    );
-    _isUndoingOrRedoing = false;
-    _updateState();
   }
 
   void _updateState() {
     if (widget.controller != null) {
       widget.controller?.updateState(
-        canUndo: _undoStack.isNotEmpty,
-        canRedo: _redoStack.isNotEmpty,
+        canUndo: _undoController.value.canUndo,
+        canRedo: _undoController.value.canRedo,
         canFormat: widget.language != 'python',
       );
     }
@@ -132,8 +48,8 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
 
   void _attachController() {
     widget.controller?.attach(
-      onUndo: _undo,
-      onRedo: _redo,
+      onUndo: () => _undoController.undo(),
+      onRedo: () => _undoController.redo(),
       onFormat: _formatCode,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateState());
@@ -202,8 +118,8 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
 
   @override
   void dispose() {
-    _typingDebouncer?.cancel();
     widget.controller?.detach();
+    _undoController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -212,6 +128,7 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
   Widget build(BuildContext context) {
     return TextField(
       controller: _controller,
+      undoController: _undoController,
       maxLines: null,
       expands: true,
       style: const TextStyle(
