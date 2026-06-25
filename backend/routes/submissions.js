@@ -436,8 +436,11 @@ router.get('/:id', authMiddleware, async (req, res) => {
                 language,
                 time_ms AS runtime_ms,
                 memory_kb,
-                0 AS passed_cases,
-                0 AS total_cases,
+                CASE 
+                  WHEN verdict = 'Accepted' THEN (SELECT COUNT(*) FROM test_cases WHERE problem_id = contest_submissions.problem_id)
+                  ELSE 0
+                END AS passed_cases,
+                (SELECT COUNT(*) FROM test_cases WHERE problem_id = contest_submissions.problem_id) AS total_cases,
                 to_char((submitted_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS created_at,
                 code,
                 compile_output AS error_message,

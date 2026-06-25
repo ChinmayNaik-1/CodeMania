@@ -87,9 +87,9 @@ class SocketService {
     _socket?.off('submission_result');
   }
 
-  static void onLeaderboardUpdate(Function(Map<String, dynamic>) callback) {
+  static void onLeaderboardUpdate(Function(dynamic) callback) {
     socket.on('leaderboard_update', (data) {
-      callback(data as Map<String, dynamic>);
+      callback(data);
     });
   }
 
