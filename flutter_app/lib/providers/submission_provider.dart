@@ -126,9 +126,11 @@ class SubmissionNotifier extends StateNotifier<SubmissionState> {
     }
   }
 
-  Future<Map<String, dynamic>?> fetchSubmissionById(int submissionId) async {
+  Future<Map<String, dynamic>?> fetchSubmissionById(int submissionId, {int? contestId}) async {
     try {
-      final response = await ApiService.get('/submit/$submissionId');
+      String url = '/api/submissions/$submissionId';
+      if (contestId != null) url += '?contestId=$contestId';
+      final response = await ApiService.get(url);
       return response.data['submission'] as Map<String, dynamic>?;
     } catch (_) {
       return null;

@@ -149,7 +149,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = int.tryParse(state.pathParameters['id'] ?? '0') ?? 0;
           final submissionId = int.tryParse(state.pathParameters['submissionId'] ?? '0') ?? 0;
-          return SubmissionDetailScreen(problemId: id, submissionId: submissionId);
+          final contestId = int.tryParse(state.uri.queryParameters['contestId'] ?? '0');
+          return SubmissionDetailScreen(
+            problemId: id, 
+            submissionId: submissionId, 
+            contestId: contestId == 0 ? null : contestId,
+          );
         },
       ),
       GoRoute(
@@ -157,7 +162,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'submissionDetailFull',
         builder: (context, state) {
           final submissionId = int.tryParse(state.pathParameters['submissionId'] ?? '0') ?? 0;
-          return SubmissionDetailFullScreen(submissionId: submissionId);
+          final contestId = int.tryParse(state.uri.queryParameters['contestId'] ?? '0');
+          return SubmissionDetailFullScreen(
+            submissionId: submissionId,
+            contestId: contestId == 0 ? null : contestId,
+          );
         },
       ),
       GoRoute(

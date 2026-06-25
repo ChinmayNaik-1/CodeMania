@@ -5,10 +5,8 @@ import 'package:codemania/services/api_service.dart';
 import 'package:codemania/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 
-// Provider for submission detail
-final submissionDetailProvider = FutureProvider.family<Map<String, dynamic>, int>((ref, submissionId) async {
-  final response = await ApiService.get('/api/submissions/$submissionId');
-  return response.data['submission'] as Map<String, dynamic>;
+final submissionDetailProvider = FutureProvider.family<Map<String, dynamic>, ({int submissionId, int? contestId})>((ref, arg) async {
+  return await ref.read(submissionProvider.notifier).fetchSubmissionById(arg.submissionId, contestId: arg.contestId) ?? {};
 });
 
 class SubmissionDetailScreen extends ConsumerWidget {
@@ -16,16 +14,18 @@ class SubmissionDetailScreen extends ConsumerWidget {
     super.key,
     required this.problemId,
     required this.submissionId,
+    this.contestId,
   });
 
   final int problemId;
   final int submissionId;
+  final int? contestId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final submissionAsync = ref.watch(submissionDetailProvider(submissionId));
+    final submissionAsync = ref.watch(submissionDetailProvider((submissionId: submissionId, contestId: contestId)));
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -72,7 +72,7 @@ class SubmissionDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref.invalidate(submissionDetailProvider(submissionId)),
+                onPressed: () => ref.invalidate(submissionDetailProvider((submissionId: submissionId, contestId: contestId))),
                 child: const Text('Retry'),
               ),
             ],

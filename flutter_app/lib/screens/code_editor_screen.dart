@@ -308,8 +308,16 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
           ?? (response.data['submissionId'] as num?)?.toInt();
       
       if (submissionId != null) {
-        // Poll for result
-        await _pollSubmissionResult(submissionId);
+        if (contestId != null) {
+          if (mounted) {
+            Navigator.of(context).pop(); // Close judging overlay
+            ref.invalidate(submissionProvider);
+            context.push('/submissions/$submissionId?contestId=$contestId');
+          }
+        } else {
+          // Poll for result for normal submissions
+          await _pollSubmissionResult(submissionId);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -345,7 +353,11 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
         ref.invalidate(submissionProvider);
         
         // Navigate to submission detail full screen
-        context.push('/submissions/$submissionId');
+        if (widget.contestId != null) {
+          context.push('/submissions/$submissionId?contestId=${widget.contestId}');
+        } else {
+          context.push('/submissions/$submissionId');
+        }
       }
       return;
     }

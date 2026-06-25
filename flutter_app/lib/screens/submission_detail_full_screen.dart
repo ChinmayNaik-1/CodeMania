@@ -10,15 +10,17 @@ class SubmissionDetailFullScreen extends ConsumerWidget {
   const SubmissionDetailFullScreen({
     super.key,
     required this.submissionId,
+    this.contestId,
   });
 
   final int submissionId;
+  final int? contestId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final submissionAsync = ref.watch(submissionDetailProvider(submissionId));
+    final submissionAsync = ref.watch(submissionDetailProvider((submissionId: submissionId, contestId: contestId)));
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
