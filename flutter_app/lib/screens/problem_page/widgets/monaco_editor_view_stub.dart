@@ -118,7 +118,6 @@ class _MonacoEditorViewState extends State<MonacoEditorView> {
 
   @override
   void dispose() {
-    widget.controller?.detach();
     _undoController.dispose();
     _controller.dispose();
     super.dispose();
