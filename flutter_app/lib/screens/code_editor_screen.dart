@@ -547,8 +547,6 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
       bottomSheet: consoleVisible && problem != null
           ? Builder(
               builder: (context) {
-                // Capture bottom padding before bottom sheet context
-                final bottomPadding = MediaQuery.of(context).padding.bottom;
                 return MediaQuery.removePadding(
                   context: context,
                   removeTop: true,
@@ -560,7 +558,6 @@ class _CodeEditorScreenState extends ConsumerState<CodeEditorScreen> {
                     onClose: () {
                       ref.read(consoleSheetVisibleProvider.notifier).state = false;
                     },
-                    systemBottomPadding: bottomPadding,
                   ),
                 );
               },
